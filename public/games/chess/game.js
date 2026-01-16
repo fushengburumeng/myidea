@@ -1,4 +1,4 @@
-// 中国象棋在线对弈
+// 中国象棋在线对弈 / AI对弈
 (function() {
     const roomData = JSON.parse(sessionStorage.getItem('roomData') || '{}');
     if (!roomData.roomId) {
@@ -6,9 +6,10 @@
         return;
     }
 
+    const isAiMode = roomData.mode === 'ai';
     let ws = null;
-    let mySeat = roomData.seat;
-    let gameStarted = false;
+    let mySeat = isAiMode ? 0 : roomData.seat;
+    let gameStarted = isAiMode;
     let currentPlayer = 0;
     let board = [];
     let selectedPiece = null;
@@ -39,12 +40,20 @@
         '-1': '車', '-2': '馬', '-3': '象', '-4': '士', '-5': '將', '-6': '砲', '-7': '卒'
     };
 
-    let players = roomData.players || [{ name: localStorage.getItem('playerName') || '玩家', seat: 0, ready: false }];
+    let players = isAiMode
+        ? [{ name: '你', seat: 0, ready: true }, { name: 'AI', seat: 1, ready: true }]
+        : (roomData.players || [{ name: localStorage.getItem('playerName') || '玩家', seat: 0, ready: false }]);
 
-    roomIdEl.textContent = roomData.roomId;
+    roomIdEl.textContent = isAiMode ? 'AI对弈' : roomData.roomId;
     initBoard();
     renderPlayers();
     draw();
+
+    if (isAiMode) {
+        readyBtn.style.display = 'none';
+        updateStatus();
+        addChatMessage('系统', '游戏开始！你执红先行');
+    }
 
     function initBoard() {
         board = Array(rows).fill(null).map(() => Array(cols).fill(0));
@@ -59,6 +68,7 @@
     }
 
     function connect() {
+        if (isAiMode) return;
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(`${protocol}//${location.host}`);
 

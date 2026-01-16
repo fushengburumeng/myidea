@@ -26,7 +26,26 @@
                 <div class="game-buttons">
                     <button id="ready-btn" class="btn-ready">准备</button>
                     <button id="pass-btn" class="btn-secondary" disabled>停一手</button>
+                    <button id="settings-btn" class="btn-secondary">设置</button>
                     <button id="leave-btn" class="btn-leave">离开房间</button>
+                </div>
+                <!-- 设置面板 -->
+                <div id="settings-panel" class="settings-panel hidden">
+                    <h4>游戏设置</h4>
+                    <div class="setting-item">
+                        <label>AI难度:</label>
+                        <select id="ai-difficulty">
+                            <option value="easy">简单</option>
+                            <option value="medium" selected>中等</option>
+                            <option value="hard">困难</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label><input type="checkbox" id="show-qi"> 显示气</label>
+                    </div>
+                    <div class="setting-item">
+                        <label><input type="checkbox" id="show-shi"> 显示势力</label>
+                    </div>
                 </div>
                 <div class="chat-box">
                     <div class="chat-messages" id="chat-messages"></div>

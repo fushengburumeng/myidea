@@ -17,6 +17,11 @@
     const cellSize = 28;
     const padding = 20;
 
+    // 设置
+    let aiDifficulty = 'medium';
+    let showQi = false;
+    let showShi = false;
+
     const canvas = document.getElementById('board');
     const ctx = canvas.getContext('2d');
     canvas.width = (size - 1) * cellSize + padding * 2;
@@ -29,10 +34,15 @@
     const whiteCapturesEl = document.getElementById('white-captures');
     const readyBtn = document.getElementById('ready-btn');
     const passBtn = document.getElementById('pass-btn');
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsPanel = document.getElementById('settings-panel');
     const leaveBtn = document.getElementById('leave-btn');
     const chatMessages = document.getElementById('chat-messages');
     const chatInput = document.getElementById('chat-input');
     const chatSend = document.getElementById('chat-send');
+    const aiDifficultyEl = document.getElementById('ai-difficulty');
+    const showQiEl = document.getElementById('show-qi');
+    const showShiEl = document.getElementById('show-shi');
 
     let players = isAiMode
         ? [{ name: '你', seat: 0, ready: true }, { name: 'AI', seat: 1, ready: true }]
@@ -49,6 +59,22 @@
         updateStatus();
         addChatMessage('系统', '游戏开始！你执黑先行');
     }
+
+    // 设置面板
+    settingsBtn.addEventListener('click', () => {
+        settingsPanel.classList.toggle('hidden');
+    });
+    aiDifficultyEl.addEventListener('change', (e) => {
+        aiDifficulty = e.target.value;
+    });
+    showQiEl.addEventListener('change', (e) => {
+        showQi = e.target.checked;
+        draw();
+    });
+    showShiEl.addEventListener('change', (e) => {
+        showShi = e.target.checked;
+        draw();
+    });
 
     function initBoard() {
         board = Array(size).fill(null).map(() => Array(size).fill(0));
@@ -131,7 +157,14 @@
         }
         if (moves.length === 0) return null;
         moves.sort((a, b) => b[2] - a[2]);
-        const top = moves.slice(0, Math.min(3, moves.length));
+
+        // 根据难度选择
+        let topN;
+        if (aiDifficulty === 'easy') topN = Math.min(10, moves.length);
+        else if (aiDifficulty === 'hard') topN = 1;
+        else topN = Math.min(3, moves.length);
+
+        const top = moves.slice(0, topN);
         const choice = top[Math.floor(Math.random() * top.length)];
         return [choice[0], choice[1]];
     }
@@ -293,6 +326,12 @@
     function draw() {
         ctx.fillStyle = '#dcb35c';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 显示势力范围
+        if (showShi) {
+            drawInfluence();
+        }
+
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 1;
         for (let i = 0; i < size; i++) {
@@ -315,6 +354,69 @@
         for (let x = 0; x < size; x++) {
             for (let y = 0; y < size; y++) {
                 if (board[x][y] !== 0) drawStone(x, y, board[x][y]);
+            }
+        }
+
+        // 显示气
+        if (showQi) {
+            drawLiberties();
+        }
+    }
+
+    // 绘制势力范围
+    function drawInfluence() {
+        const influence = Array(size).fill(null).map(() => Array(size).fill(0));
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                if (board[x][y] !== 0) {
+                    const color = board[x][y] === 1 ? 1 : -1;
+                    for (let dx = -4; dx <= 4; dx++) {
+                        for (let dy = -4; dy <= 4; dy++) {
+                            const nx = x + dx, ny = y + dy;
+                            if (nx >= 0 && nx < size && ny >= 0 && ny < size) {
+                                const dist = Math.abs(dx) + Math.abs(dy);
+                                if (dist <= 4) influence[nx][ny] += color * (5 - dist);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                if (board[x][y] === 0 && influence[x][y] !== 0) {
+                    const cx = padding + x * cellSize;
+                    const cy = padding + y * cellSize;
+                    const val = Math.min(Math.abs(influence[x][y]) / 15, 1);
+                    if (influence[x][y] > 0) {
+                        ctx.fillStyle = `rgba(0,0,0,${val * 0.3})`;
+                    } else {
+                        ctx.fillStyle = `rgba(255,255,255,${val * 0.5})`;
+                    }
+                    ctx.fillRect(cx - cellSize/2, cy - cellSize/2, cellSize, cellSize);
+                }
+            }
+        }
+    }
+
+    // 绘制所有棋群的气
+    function drawLiberties() {
+        const visited = new Set();
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                if (board[x][y] !== 0 && !visited.has(`${x},${y}`)) {
+                    const group = getGroup(x, y);
+                    group.stones.forEach(([sx, sy]) => visited.add(`${sx},${sy}`));
+                    const color = board[x][y] === 1 ? 'rgba(0,100,0,0.7)' : 'rgba(100,0,100,0.7)';
+                    group.liberties.forEach(([lx, ly]) => {
+                        const cx = padding + lx * cellSize;
+                        const cy = padding + ly * cellSize;
+                        ctx.fillStyle = color;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                }
             }
         }
     }

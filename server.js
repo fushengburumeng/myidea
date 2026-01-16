@@ -147,6 +147,23 @@ function joinRoom(ws, roomId) {
         sendTo(ws, { type: 'error', message: '房间不存在' });
         return;
     }
+
+    // 检查是否是已有玩家重新连接（通过名字匹配）
+    const existingPlayer = room.players.find(p => p.name === ws.playerData.name);
+    if (existingPlayer) {
+        // 更新 ws 引用
+        existingPlayer.ws = ws;
+        ws.playerData.roomId = roomId;
+        sendTo(ws, {
+            type: 'roomJoined',
+            roomId,
+            seat: existingPlayer.seat,
+            gameType: room.gameType,
+            players: room.players.map(p => ({ name: p.name, seat: p.seat, ready: p.ready }))
+        });
+        return;
+    }
+
     if (room.players.length >= room.maxPlayers) {
         sendTo(ws, { type: 'error', message: '房间已满' });
         return;
