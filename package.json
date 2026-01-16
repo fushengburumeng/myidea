@@ -3,11 +3,20 @@
   "version": "1.0.0",
   "description": "多人在线游戏平台 - 围棋、五子棋、中国象棋、斗地主",
   "main": "server.js",
+  "bin": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "pkg . --targets node18-win-x64,node18-linux-x64 --output dist/game-server"
+  },
+  "pkg": {
+    "assets": ["public/**/*"],
+    "outputPath": "dist"
   },
   "dependencies": {
     "ws": "^8.14.2",
     "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
   }
 }

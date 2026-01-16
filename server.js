@@ -571,7 +571,7 @@ function handleDisconnect(ws) {
     leaveRoom(ws);
 }
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 9527;
 server.listen(PORT, () => {
     console.log(`游戏服务器运行在 http://localhost:${PORT}`);
 });
