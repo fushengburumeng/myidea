@@ -9,6 +9,7 @@
     const modalTitle = document.getElementById('modal-title');
     const closeModalBtn = document.getElementById('close-modal');
     const createRoomBtn = document.getElementById('create-room');
+    const playAiBtn = document.getElementById('play-ai');
     const refreshRoomsBtn = document.getElementById('refresh-rooms');
     const roomList = document.getElementById('room-list');
     const roomIdInput = document.getElementById('room-id-input');
@@ -60,7 +61,9 @@
                 break;
             case 'roomCreated':
             case 'roomJoined':
-                // 跳转到游戏页面
+                // 跳转前关闭WebSocket，避免触发leaveRoom
+                ws.onclose = null;
+                ws.close();
                 sessionStorage.setItem('roomData', JSON.stringify(msg));
                 window.location.href = `/games/${msg.gameType}/`;
                 break;
@@ -141,6 +144,20 @@
     }
 
     refreshRoomsBtn.addEventListener('click', refreshRooms);
+
+    // 与AI对弈
+    playAiBtn.addEventListener('click', () => {
+        if (currentGame === 'weiqi' || currentGame === 'gomoku') {
+            sessionStorage.setItem('roomData', JSON.stringify({
+                gameType: currentGame,
+                mode: 'ai',
+                roomId: 'ai-' + Date.now()
+            }));
+            window.location.href = `/games/${currentGame}/`;
+        } else {
+            alert('该游戏暂不支持AI对弈');
+        }
+    });
 
     // 通过房间号加入
     joinByIdBtn.addEventListener('click', () => {

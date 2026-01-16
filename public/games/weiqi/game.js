@@ -1,4 +1,4 @@
-// 围棋在线对弈
+// 围棋在线对弈 / AI对弈
 (function() {
     const roomData = JSON.parse(sessionStorage.getItem('roomData') || '{}');
     if (!roomData.roomId) {
@@ -6,9 +6,10 @@
         return;
     }
 
+    const isAiMode = roomData.mode === 'ai';
     let ws = null;
-    let mySeat = roomData.seat;
-    let gameStarted = false;
+    let mySeat = isAiMode ? 0 : roomData.seat;
+    let gameStarted = isAiMode;
     let currentPlayer = 0;
     let board = [];
     let captures = [0, 0];
@@ -33,18 +34,147 @@
     const chatInput = document.getElementById('chat-input');
     const chatSend = document.getElementById('chat-send');
 
-    let players = roomData.players || [{ name: localStorage.getItem('playerName') || '玩家', seat: 0, ready: false }];
+    let players = isAiMode
+        ? [{ name: '你', seat: 0, ready: true }, { name: 'AI', seat: 1, ready: true }]
+        : (roomData.players || [{ name: localStorage.getItem('playerName') || '玩家', seat: 0, ready: false }]);
 
-    roomIdEl.textContent = roomData.roomId;
+    roomIdEl.textContent = isAiMode ? 'AI对弈' : roomData.roomId;
     initBoard();
     renderPlayers();
     draw();
+
+    if (isAiMode) {
+        readyBtn.style.display = 'none';
+        passBtn.disabled = false;
+        updateStatus();
+        addChatMessage('系统', '游戏开始！你执黑先行');
+    }
 
     function initBoard() {
         board = Array(size).fill(null).map(() => Array(size).fill(0));
     }
 
+    // ========== AI逻辑 ==========
+    function getNeighbors(x, y) {
+        const neighbors = [];
+        const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+        for (const [dx, dy] of dirs) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && nx < size && ny >= 0 && ny < size) neighbors.push([nx, ny]);
+        }
+        return neighbors;
+    }
+
+    function getGroup(x, y) {
+        const color = board[x][y];
+        if (color === 0) return { stones: [], liberties: [] };
+        const visited = new Set();
+        const stones = [];
+        const liberties = new Set();
+        const stack = [[x, y]];
+        while (stack.length > 0) {
+            const [cx, cy] = stack.pop();
+            const key = `${cx},${cy}`;
+            if (visited.has(key)) continue;
+            visited.add(key);
+            if (board[cx][cy] === color) {
+                stones.push([cx, cy]);
+                for (const [nx, ny] of getNeighbors(cx, cy)) {
+                    if (board[nx][ny] === 0) liberties.add(`${nx},${ny}`);
+                    else if (board[nx][ny] === color && !visited.has(`${nx},${ny}`)) stack.push([nx, ny]);
+                }
+            }
+        }
+        return { stones, liberties: Array.from(liberties).map(s => s.split(',').map(Number)) };
+    }
+
+    function canPlace(x, y, player) {
+        if (board[x][y] !== 0) return false;
+        board[x][y] = player;
+        const opponent = player === 1 ? 2 : 1;
+        let canCapture = false;
+        for (const [nx, ny] of getNeighbors(x, y)) {
+            if (board[nx][ny] === opponent && getGroup(nx, ny).liberties.length === 0) {
+                canCapture = true;
+                break;
+            }
+        }
+        if (canCapture) { board[x][y] = 0; return true; }
+        const selfGroup = getGroup(x, y);
+        board[x][y] = 0;
+        return selfGroup.liberties.length > 0;
+    }
+
+    function placeStone(x, y, player) {
+        board[x][y] = player;
+        const opponent = player === 1 ? 2 : 1;
+        let captured = 0;
+        for (const [nx, ny] of getNeighbors(x, y)) {
+            if (board[nx][ny] === opponent) {
+                const group = getGroup(nx, ny);
+                if (group.liberties.length === 0) {
+                    captured += group.stones.length;
+                    for (const [sx, sy] of group.stones) board[sx][sy] = 0;
+                }
+            }
+        }
+        if (player === 1) captures[0] += captured;
+        else captures[1] += captured;
+    }
+
+    function aiMove() {
+        const moves = [];
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                if (canPlace(x, y, 2)) moves.push([x, y, evaluateMove(x, y)]);
+            }
+        }
+        if (moves.length === 0) return null;
+        moves.sort((a, b) => b[2] - a[2]);
+        const top = moves.slice(0, Math.min(3, moves.length));
+        const choice = top[Math.floor(Math.random() * top.length)];
+        return [choice[0], choice[1]];
+    }
+
+    function evaluateMove(x, y) {
+        let score = 0;
+        // 吃子
+        board[x][y] = 2;
+        for (const [nx, ny] of getNeighbors(x, y)) {
+            if (board[nx][ny] === 1 && getGroup(nx, ny).liberties.length === 0) score += 50;
+        }
+        board[x][y] = 0;
+        // 防守
+        for (const [nx, ny] of getNeighbors(x, y)) {
+            if (board[nx][ny] === 2) {
+                const g = getGroup(nx, ny);
+                if (g.liberties.length <= 2) score += 30;
+            }
+        }
+        // 中心偏好
+        const center = size / 2;
+        score += Math.max(0, 10 - Math.abs(x - center) - Math.abs(y - center));
+        return score;
+    }
+
+    function doAiMove() {
+        setTimeout(() => {
+            const move = aiMove();
+            if (move) {
+                placeStone(move[0], move[1], 2);
+                currentPlayer = 0;
+            } else {
+                addChatMessage('AI', '停一手');
+                currentPlayer = 0;
+            }
+            updateStatus();
+            draw();
+        }, 500);
+    }
+    // ========== AI逻辑结束 ==========
+
     function connect() {
+        if (isAiMode) return;
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(`${protocol}//${location.host}`);
 
@@ -102,7 +232,6 @@
                 if (msg.action === 'place') {
                     board[msg.x][msg.y] = msg.player + 1;
                     currentPlayer = msg.currentPlayer;
-                    // 简单处理提子（服务端应该发送完整状态，这里简化）
                     draw();
                 } else if (msg.action === 'pass') {
                     currentPlayer = msg.currentPlayer;
@@ -164,8 +293,6 @@
     function draw() {
         ctx.fillStyle = '#dcb35c';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // 画网格
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 1;
         for (let i = 0; i < size; i++) {
@@ -178,8 +305,6 @@
             ctx.lineTo(padding + (size - 1) * cellSize, padding + i * cellSize);
             ctx.stroke();
         }
-
-        // 星位
         const stars = [[3,3],[3,9],[3,15],[9,3],[9,9],[9,15],[15,3],[15,9],[15,15]];
         ctx.fillStyle = '#000';
         for (const [x, y] of stars) {
@@ -187,13 +312,9 @@
             ctx.arc(padding + x * cellSize, padding + y * cellSize, 4, 0, Math.PI * 2);
             ctx.fill();
         }
-
-        // 棋子
         for (let x = 0; x < size; x++) {
             for (let y = 0; y < size; y++) {
-                if (board[x][y] !== 0) {
-                    drawStone(x, y, board[x][y]);
-                }
+                if (board[x][y] !== 0) drawStone(x, y, board[x][y]);
             }
         }
     }
@@ -202,12 +323,10 @@
         const cx = padding + x * cellSize;
         const cy = padding + y * cellSize;
         const r = cellSize * 0.43;
-
         ctx.beginPath();
         ctx.arc(cx + 2, cy + 2, r, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.fill();
-
         const gradient = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
         if (color === 1) {
             gradient.addColorStop(0, '#555');
@@ -233,23 +352,43 @@
         if (!gameStarted || mySeat !== currentPlayer) return;
         const rect = canvas.getBoundingClientRect();
         const pos = toBoard(e.clientX - rect.left, e.clientY - rect.top);
-        if (pos && board[pos[0]][pos[1]] === 0) {
+        if (!pos || board[pos[0]][pos[1]] !== 0) return;
+
+        if (isAiMode) {
+            if (!canPlace(pos[0], pos[1], 1)) return;
+            placeStone(pos[0], pos[1], 1);
+            currentPlayer = 1;
+            updateStatus();
+            draw();
+            doAiMove();
+        } else {
             ws.send(JSON.stringify({ type: 'gameAction', action: 'place', x: pos[0], y: pos[1] }));
         }
     });
 
     readyBtn.addEventListener('click', () => {
-        ws.send(JSON.stringify({ type: 'ready' }));
+        if (!isAiMode) ws.send(JSON.stringify({ type: 'ready' }));
     });
 
     passBtn.addEventListener('click', () => {
         if (gameStarted && mySeat === currentPlayer) {
-            ws.send(JSON.stringify({ type: 'gameAction', action: 'pass' }));
+            if (isAiMode) {
+                addChatMessage('你', '停一手');
+                currentPlayer = 1;
+                updateStatus();
+                doAiMove();
+            } else {
+                ws.send(JSON.stringify({ type: 'gameAction', action: 'pass' }));
+            }
         }
     });
 
     leaveBtn.addEventListener('click', () => {
-        ws.send(JSON.stringify({ type: 'leaveRoom' }));
+        if (isAiMode) {
+            window.location.href = '/';
+        } else {
+            ws.send(JSON.stringify({ type: 'leaveRoom' }));
+        }
     });
 
     function addChatMessage(name, text) {
@@ -263,7 +402,11 @@
     chatSend.addEventListener('click', () => {
         const text = chatInput.value.trim();
         if (text) {
-            ws.send(JSON.stringify({ type: 'chat', text }));
+            if (isAiMode) {
+                addChatMessage('你', text);
+            } else {
+                ws.send(JSON.stringify({ type: 'chat', text }));
+            }
             chatInput.value = '';
         }
     });
