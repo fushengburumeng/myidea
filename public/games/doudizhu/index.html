@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>斗地主 - 多人对弈</title>
+    <link rel="stylesheet" href="../../css/common.css">
+</head>
+<body>
+    <div class="container">
+        <h1>斗地主</h1>
+        <div class="game-room">
+            <div class="doudizhu-area">
+                <!-- 其他玩家 -->
+                <div class="other-players">
+                    <div class="other-player" id="player-left">
+                        <div class="player-name">等待加入...</div>
+                        <div class="card-count"></div>
+                        <div class="player-action"></div>
+                    </div>
+                    <div class="other-player" id="player-right">
+                        <div class="player-name">等待加入...</div>
+                        <div class="card-count"></div>
+                        <div class="player-action"></div>
+                    </div>
+                </div>
+
+                <!-- 出牌区 -->
+                <div class="play-area" id="play-area">
+                    <p class="tip">等待游戏开始</p>
+                </div>
+
+                <!-- 底牌 -->
+                <div class="dizhu-cards hidden" id="dizhu-cards">
+                    <span>底牌:</span>
+                    <div class="cards" id="dizhu-display"></div>
+                </div>
+
+                <!-- 我的手牌 -->
+                <div class="my-cards">
+                    <div class="cards-area" id="my-cards"></div>
+                    <div class="action-buttons" id="action-buttons">
+                        <button id="play-btn" class="btn-primary" disabled>出牌</button>
+                        <button id="pass-btn" class="btn-secondary" disabled>不出</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="game-panel">
+                <div class="room-info-panel">
+                    <h4>房间 #<span id="room-id">----</span></h4>
+                    <div class="player-list" id="player-list"></div>
+                </div>
+                <div class="game-info">
+                    <p>当前: <span id="current-player">等待开始</span></p>
+                    <p>地主: <span id="landlord-info">未确定</span></p>
+                </div>
+                <div class="game-buttons">
+                    <button id="ready-btn" class="btn-ready">准备</button>
+                    <button id="leave-btn" class="btn-leave">离开房间</button>
+                </div>
+                <!-- 叫地主按钮 -->
+                <div class="bid-buttons hidden" id="bid-buttons">
+                    <button id="bid-yes" class="btn-primary">叫地主</button>
+                    <button id="bid-no" class="btn-secondary">不叫</button>
+                </div>
+                <div class="chat-box">
+                    <div class="chat-messages" id="chat-messages"></div>
+                    <div class="chat-input">
+                        <input type="text" id="chat-input" placeholder="输入消息...">
+                        <button id="chat-send">发送</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>

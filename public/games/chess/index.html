@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中国象棋 - 多人对弈</title>
+    <link rel="stylesheet" href="../../css/common.css">
+    <style>
+        .chess-board { background: #f0d9b5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>中国象棋</h1>
+        <div class="game-room">
+            <div class="game-board chess-board">
+                <canvas id="board"></canvas>
+            </div>
+            <div class="game-panel">
+                <div class="room-info-panel">
+                    <h4>房间 #<span id="room-id">----</span></h4>
+                    <div class="player-list" id="player-list"></div>
+                </div>
+                <div class="game-info">
+                    <p>当前: <span id="current-player">等待开始</span></p>
+                </div>
+                <div class="game-buttons">
+                    <button id="ready-btn" class="btn-ready">准备</button>
+                    <button id="leave-btn" class="btn-leave">离开房间</button>
+                </div>
+                <div class="chat-box">
+                    <div class="chat-messages" id="chat-messages"></div>
+                    <div class="chat-input">
+                        <input type="text" id="chat-input" placeholder="输入消息...">
+                        <button id="chat-send">发送</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
