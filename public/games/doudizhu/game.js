@@ -159,7 +159,10 @@
                 passBtn.disabled = true;
                 bidButtons.classList.add('hidden');
                 const winText = msg.winner === 'landlord' ? '地主获胜！' : '农民获胜！';
+                const ddzIsWinner = (msg.winner === 'landlord' && mySeat === landlord) ||
+                                    (msg.winner === 'farmers' && mySeat !== landlord);
                 addChatMessage('系统', `游戏结束！${winText}`);
+                showGameEndEffect(ddzIsWinner, ddzIsWinner ? '你赢了！' : '你输了');
                 break;
             case 'gameEnded':
                 gameStarted = false;
@@ -178,6 +181,10 @@
                 break;
             case 'error':
                 alert(msg.message);
+                // 收到错误后返回大厅，避免重连循环
+                ws.onclose = null;
+                ws.close();
+                window.location.href = '/';
                 break;
         }
     }
@@ -356,6 +363,43 @@
     chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') chatSend.click();
     });
+
+    // 游戏结束动画效果
+    function showGameEndEffect(isWinner, message) {
+        const overlay = document.createElement('div');
+        overlay.className = 'game-end-overlay';
+        overlay.innerHTML = `<div class="game-end-message ${isWinner ? 'win' : 'lose'}">${message}</div>`;
+        document.body.appendChild(overlay);
+
+        if (isWinner) {
+            const colors = ['#ff0', '#f0f', '#0ff', '#f00', '#0f0', '#00f', '#ff6b6b', '#4ecdc4'];
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = Math.random() * 100 + 'vw';
+                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
+                    document.body.appendChild(confetti);
+                    setTimeout(() => confetti.remove(), 4000);
+                }, i * 50);
+            }
+        } else {
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    const boo = document.createElement('div');
+                    boo.className = 'boo-particle';
+                    boo.textContent = '👎';
+                    boo.style.left = Math.random() * 100 + 'vw';
+                    boo.style.animationDuration = (2 + Math.random() * 1) + 's';
+                    document.body.appendChild(boo);
+                    setTimeout(() => boo.remove(), 3000);
+                }, i * 100);
+            }
+        }
+
+        setTimeout(() => overlay.remove(), 3000);
+    }
 
     connect();
 })();

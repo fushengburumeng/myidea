@@ -8,7 +8,9 @@
       "Bash(npm install:*)",
       "Bash(npm run build:*)",
       "Bash(git remote set-url:*)",
-      "Bash(ssh:*)"
+      "Bash(ssh:*)",
+      "Bash(tree:*)",
+      "Bash(find:*)"
     ]
   }
 }

@@ -58,6 +58,10 @@
         passBtn.disabled = false;
         updateStatus();
         addChatMessage('系统', '游戏开始！你执黑先行');
+    } else {
+        // 双人对战模式隐藏AI难度设置
+        const aiDifficultyItem = aiDifficultyEl.closest('.setting-item');
+        if (aiDifficultyItem) aiDifficultyItem.style.display = 'none';
     }
 
     // 设置面板
@@ -277,7 +281,10 @@
                 gameStarted = false;
                 readyBtn.disabled = false;
                 passBtn.disabled = true;
-                addChatMessage('系统', `游戏结束！${msg.winner === 0 ? '黑方' : '白方'}获胜`);
+                const weiqiWinnerName = msg.winner === 0 ? '黑方' : '白方';
+                const weiqiIsWinner = msg.winner === mySeat;
+                addChatMessage('系统', `游戏结束！${weiqiWinnerName}获胜`);
+                showGameEndEffect(weiqiIsWinner, weiqiIsWinner ? '你赢了！' : '你输了');
                 break;
             case 'gameEnded':
                 gameStarted = false;
@@ -293,6 +300,10 @@
                 break;
             case 'error':
                 alert(msg.message);
+                // 收到错误后返回大厅，避免重连循环
+                ws.onclose = null;
+                ws.close();
+                window.location.href = '/';
                 break;
         }
     }
@@ -516,6 +527,47 @@
     chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') chatSend.click();
     });
+
+    // 游戏结束动画效果
+    function showGameEndEffect(isWinner, message) {
+        // 显示消息
+        const overlay = document.createElement('div');
+        overlay.className = 'game-end-overlay';
+        overlay.innerHTML = `<div class="game-end-message ${isWinner ? 'win' : 'lose'}">${message}</div>`;
+        document.body.appendChild(overlay);
+
+        if (isWinner) {
+            // 撒花效果
+            const colors = ['#ff0', '#f0f', '#0ff', '#f00', '#0f0', '#00f', '#ff6b6b', '#4ecdc4'];
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = Math.random() * 100 + 'vw';
+                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
+                    document.body.appendChild(confetti);
+                    setTimeout(() => confetti.remove(), 4000);
+                }, i * 50);
+            }
+        } else {
+            // 嘘声效果
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    const boo = document.createElement('div');
+                    boo.className = 'boo-particle';
+                    boo.textContent = '👎';
+                    boo.style.left = Math.random() * 100 + 'vw';
+                    boo.style.animationDuration = (2 + Math.random() * 1) + 's';
+                    document.body.appendChild(boo);
+                    setTimeout(() => boo.remove(), 3000);
+                }, i * 100);
+            }
+        }
+
+        // 3秒后移除消息
+        setTimeout(() => overlay.remove(), 3000);
+    }
 
     connect();
 })();

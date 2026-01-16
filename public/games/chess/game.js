@@ -40,6 +40,9 @@
         '-1': '車', '-2': '馬', '-3': '象', '-4': '士', '-5': '將', '-6': '砲', '-7': '卒'
     };
 
+    // 棋子价值（用于AI评估）
+    const pieceValues = { 1: 600, 2: 270, 3: 120, 4: 120, 5: 10000, 6: 285, 7: 30 };
+
     let players = isAiMode
         ? [{ name: '你', seat: 0, ready: true }, { name: 'AI', seat: 1, ready: true }]
         : (roomData.players || [{ name: localStorage.getItem('playerName') || '玩家', seat: 0, ready: false }]);
@@ -66,6 +69,301 @@
         board[7][1] = 6; board[7][7] = 6;
         board[6] = [7, 0, 7, 0, 7, 0, 7, 0, 7];
     }
+
+    // ========== 棋子移动规则 ==========
+    // 计算两点之间的棋子数量（不含起点终点）
+    function countPiecesBetween(x1, y1, x2, y2) {
+        let count = 0;
+        if (x1 === x2) {
+            const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+            for (let y = minY + 1; y < maxY; y++) {
+                if (board[y][x1] !== 0) count++;
+            }
+        } else if (y1 === y2) {
+            const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+            for (let x = minX + 1; x < maxX; x++) {
+                if (board[y1][x] !== 0) count++;
+            }
+        }
+        return count;
+    }
+
+    // 验证移动是否合法
+    function isValidMove(fromX, fromY, toX, toY, piece) {
+        const absPiece = Math.abs(piece);
+        const isRed = piece > 0;
+        const target = board[toY][toX];
+
+        // 不能吃自己的棋子
+        if (target !== 0 && (target > 0) === isRed) return false;
+
+        const dx = toX - fromX, dy = toY - fromY;
+        const adx = Math.abs(dx), ady = Math.abs(dy);
+
+        switch (absPiece) {
+            case 1: // 車：直线移动，不能越子
+                if (dx !== 0 && dy !== 0) return false;
+                return countPiecesBetween(fromX, fromY, toX, toY) === 0;
+
+            case 2: // 馬：日字形，检查蹩马腿
+                if (!((adx === 1 && ady === 2) || (adx === 2 && ady === 1))) return false;
+                // 蹩马腿检查
+                if (adx === 2) {
+                    if (board[fromY][fromX + dx / 2] !== 0) return false;
+                } else {
+                    if (board[fromY + dy / 2][fromX] !== 0) return false;
+                }
+                return true;
+
+            case 3: // 象/相：田字形，不能过河，检查塞象眼
+                if (adx !== 2 || ady !== 2) return false;
+                // 不能过河
+                if (isRed && toY < 5) return false;
+                if (!isRed && toY > 4) return false;
+                // 塞象眼检查
+                if (board[fromY + dy / 2][fromX + dx / 2] !== 0) return false;
+                return true;
+
+            case 4: // 士/仕：斜线一格，不出九宫
+                if (adx !== 1 || ady !== 1) return false;
+                // 九宫范围
+                if (toX < 3 || toX > 5) return false;
+                if (isRed && (toY < 7 || toY > 9)) return false;
+                if (!isRed && (toY < 0 || toY > 2)) return false;
+                return true;
+
+            case 5: // 將/帥：九宫内一格，检查将帅对面
+                if (!((adx === 1 && ady === 0) || (adx === 0 && ady === 1))) return false;
+                // 九宫范围
+                if (toX < 3 || toX > 5) return false;
+                if (isRed && (toY < 7 || toY > 9)) return false;
+                if (!isRed && (toY < 0 || toY > 2)) return false;
+                return true;
+
+            case 6: // 炮：直线移动，吃子需隔一子
+                if (dx !== 0 && dy !== 0) return false;
+                const between = countPiecesBetween(fromX, fromY, toX, toY);
+                if (target === 0) return between === 0; // 移动
+                return between === 1; // 吃子
+
+            case 7: // 兵/卒：过河前只能前进，过河后可左右
+                if (isRed) {
+                    // 红兵向上走
+                    if (fromY > 4) { // 未过河
+                        return dx === 0 && dy === -1;
+                    } else { // 已过河
+                        return (dx === 0 && dy === -1) || (ady === 0 && adx === 1);
+                    }
+                } else {
+                    // 黑卒向下走
+                    if (fromY < 5) { // 未过河
+                        return dx === 0 && dy === 1;
+                    } else { // 已过河
+                        return (dx === 0 && dy === 1) || (ady === 0 && adx === 1);
+                    }
+                }
+        }
+        return false;
+    }
+
+    // 检查将帅是否对面（返回true表示非法局面）
+    function isKingsFacing() {
+        let redKingX = -1, redKingY = -1, blackKingX = -1, blackKingY = -1;
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                if (board[y][x] === 5) { redKingY = y; redKingX = x; }
+                if (board[y][x] === -5) { blackKingY = y; blackKingX = x; }
+            }
+        }
+        if (redKingX !== blackKingX) return false;
+        return countPiecesBetween(redKingX, redKingY, blackKingX, blackKingY) === 0;
+    }
+
+    // 获取所有合法移动
+    function getAllMoves(isRedTurn) {
+        const moves = [];
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                const piece = board[y][x];
+                if (piece === 0 || (piece > 0) !== isRedTurn) continue;
+                for (let ty = 0; ty < rows; ty++) {
+                    for (let tx = 0; tx < cols; tx++) {
+                        if (isValidMove(x, y, tx, ty, piece)) {
+                            // 模拟移动检查将帅对面
+                            const captured = board[ty][tx];
+                            board[ty][tx] = piece;
+                            board[y][x] = 0;
+                            const facing = isKingsFacing();
+                            board[y][x] = piece;
+                            board[ty][tx] = captured;
+                            if (!facing) {
+                                moves.push({ fromX: x, fromY: y, toX: tx, toY: ty, captured });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return moves;
+    }
+
+    // ========== AI逻辑 ==========
+    function evaluateBoard() {
+        let score = 0;
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                const piece = board[y][x];
+                if (piece === 0) continue;
+                const value = pieceValues[Math.abs(piece)];
+                // 位置加成
+                let posBonus = 0;
+                if (Math.abs(piece) === 7) { // 兵/卒过河加分
+                    if (piece > 0 && y < 5) posBonus = 20;
+                    if (piece < 0 && y > 4) posBonus = 20;
+                }
+                if (piece > 0) score += value + posBonus;
+                else score -= value + posBonus;
+            }
+        }
+        return score;
+    }
+
+    function minimax(depth, alpha, beta, isMaximizing) {
+        if (depth === 0) return evaluateBoard();
+
+        const moves = getAllMoves(isMaximizing);
+        if (moves.length === 0) {
+            return isMaximizing ? -100000 : 100000;
+        }
+
+        if (isMaximizing) {
+            let maxEval = -Infinity;
+            for (const move of moves) {
+                const captured = board[move.toY][move.toX];
+                const piece = board[move.fromY][move.fromX];
+                board[move.toY][move.toX] = piece;
+                board[move.fromY][move.fromX] = 0;
+
+                const eval_ = minimax(depth - 1, alpha, beta, false);
+
+                board[move.fromY][move.fromX] = piece;
+                board[move.toY][move.toX] = captured;
+
+                maxEval = Math.max(maxEval, eval_);
+                alpha = Math.max(alpha, eval_);
+                if (beta <= alpha) break;
+            }
+            return maxEval;
+        } else {
+            let minEval = Infinity;
+            for (const move of moves) {
+                const captured = board[move.toY][move.toX];
+                const piece = board[move.fromY][move.fromX];
+                board[move.toY][move.toX] = piece;
+                board[move.fromY][move.fromX] = 0;
+
+                const eval_ = minimax(depth - 1, alpha, beta, true);
+
+                board[move.fromY][move.fromX] = piece;
+                board[move.toY][move.toX] = captured;
+
+                minEval = Math.min(minEval, eval_);
+                beta = Math.min(beta, eval_);
+                if (beta <= alpha) break;
+            }
+            return minEval;
+        }
+    }
+
+    function aiMove() {
+        const moves = getAllMoves(false); // AI是黑方
+        if (moves.length === 0) return null;
+
+        let bestMove = null;
+        let bestScore = Infinity;
+
+        for (const move of moves) {
+            const captured = board[move.toY][move.toX];
+            const piece = board[move.fromY][move.fromX];
+            board[move.toY][move.toX] = piece;
+            board[move.fromY][move.fromX] = 0;
+
+            const score = minimax(2, -Infinity, Infinity, true);
+
+            board[move.fromY][move.fromX] = piece;
+            board[move.toY][move.toX] = captured;
+
+            if (score < bestScore) {
+                bestScore = score;
+                bestMove = move;
+            }
+        }
+        return bestMove;
+    }
+
+    function doAiMove() {
+        setTimeout(() => {
+            const move = aiMove();
+            if (move) {
+                const piece = board[move.fromY][move.fromX];
+                const captured = board[move.toY][move.toX];
+                board[move.toY][move.toX] = piece;
+                board[move.fromY][move.fromX] = 0;
+                currentPlayer = 0;
+                selectedPiece = null;
+                draw();
+                updateStatus();
+
+                // 检查是否吃掉了帅
+                if (captured === 5) {
+                    addChatMessage('系统', '游戏结束！黑方获胜');
+                    showGameEndEffect(false, '你输了');
+                    gameStarted = false;
+                }
+            } else {
+                addChatMessage('系统', '游戏结束！红方获胜');
+                showGameEndEffect(true, '你赢了！');
+                gameStarted = false;
+            }
+        }, 500);
+    }
+
+    function makeMove(fromX, fromY, toX, toY) {
+        const piece = board[fromY][fromX];
+        if (!isValidMove(fromX, fromY, toX, toY, piece)) {
+            addChatMessage('系统', '非法移动');
+            return false;
+        }
+
+        // 检查移动后将帅是否对面
+        const captured = board[toY][toX];
+        board[toY][toX] = piece;
+        board[fromY][fromX] = 0;
+        if (isKingsFacing()) {
+            board[fromY][fromX] = piece;
+            board[toY][toX] = captured;
+            addChatMessage('系统', '将帅不能对面');
+            return false;
+        }
+
+        currentPlayer = 1;
+        selectedPiece = null;
+        draw();
+        updateStatus();
+
+        // 检查是否吃掉了将
+        if (captured === -5) {
+            addChatMessage('系统', '游戏结束！红方获胜');
+            showGameEndEffect(true, '你赢了！');
+            gameStarted = false;
+            return true;
+        }
+
+        // AI回合
+        doAiMove();
+        return true;
+    }
+    // ========== AI逻辑结束 ==========
 
     function connect() {
         if (isAiMode) return;
@@ -135,7 +433,10 @@
             case 'gameOver':
                 gameStarted = false;
                 readyBtn.disabled = false;
-                addChatMessage('系统', `游戏结束！${msg.winner === 0 ? '红方' : '黑方'}获胜`);
+                const chessWinnerName = msg.winner === 0 ? '红方' : '黑方';
+                const chessIsWinner = msg.winner === mySeat;
+                addChatMessage('系统', `游戏结束！${chessWinnerName}获胜`);
+                showGameEndEffect(chessIsWinner, chessIsWinner ? '你赢了！' : '你输了');
                 break;
             case 'gameEnded':
                 gameStarted = false;
@@ -150,6 +451,10 @@
                 break;
             case 'error':
                 alert(msg.message);
+                // 收到错误后返回大厅，避免重连循环
+                ws.onclose = null;
+                ws.close();
+                window.location.href = '/';
                 break;
         }
     }
@@ -306,12 +611,16 @@
                 draw();
             } else {
                 // 尝试移动
-                ws.send(JSON.stringify({
-                    type: 'gameAction',
-                    action: 'move',
-                    fromX: sx, fromY: sy,
-                    toX: x, toY: y
-                }));
+                if (isAiMode) {
+                    makeMove(sx, sy, x, y);
+                } else {
+                    ws.send(JSON.stringify({
+                        type: 'gameAction',
+                        action: 'move',
+                        fromX: sx, fromY: sy,
+                        toX: x, toY: y
+                    }));
+                }
             }
         } else if (isMyPiece) {
             selectedPiece = [x, y];
@@ -324,7 +633,11 @@
     });
 
     leaveBtn.addEventListener('click', () => {
-        ws.send(JSON.stringify({ type: 'leaveRoom' }));
+        if (isAiMode) {
+            window.location.href = '/';
+        } else {
+            ws.send(JSON.stringify({ type: 'leaveRoom' }));
+        }
     });
 
     function addChatMessage(name, text) {
@@ -346,6 +659,43 @@
     chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') chatSend.click();
     });
+
+    // 游戏结束动画效果
+    function showGameEndEffect(isWinner, message) {
+        const overlay = document.createElement('div');
+        overlay.className = 'game-end-overlay';
+        overlay.innerHTML = `<div class="game-end-message ${isWinner ? 'win' : 'lose'}">${message}</div>`;
+        document.body.appendChild(overlay);
+
+        if (isWinner) {
+            const colors = ['#ff0', '#f0f', '#0ff', '#f00', '#0f0', '#00f', '#ff6b6b', '#4ecdc4'];
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = Math.random() * 100 + 'vw';
+                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
+                    document.body.appendChild(confetti);
+                    setTimeout(() => confetti.remove(), 4000);
+                }, i * 50);
+            }
+        } else {
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    const boo = document.createElement('div');
+                    boo.className = 'boo-particle';
+                    boo.textContent = '👎';
+                    boo.style.left = Math.random() * 100 + 'vw';
+                    boo.style.animationDuration = (2 + Math.random() * 1) + 's';
+                    document.body.appendChild(boo);
+                    setTimeout(() => boo.remove(), 3000);
+                }, i * 100);
+            }
+        }
+
+        setTimeout(() => overlay.remove(), 3000);
+    }
 
     connect();
 })();

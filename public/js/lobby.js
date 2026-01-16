@@ -147,7 +147,7 @@
 
     // 与AI对弈
     playAiBtn.addEventListener('click', () => {
-        if (currentGame === 'weiqi' || currentGame === 'gomoku') {
+        if (currentGame === 'weiqi' || currentGame === 'gomoku' || currentGame === 'chess') {
             sessionStorage.setItem('roomData', JSON.stringify({
                 gameType: currentGame,
                 mode: 'ai',
