@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游戏大厅</title>
+    <link rel="stylesheet" href="css/common.css">
+</head>
+<body>
+    <div class="container">
+        <h1>多人游戏平台</h1>
+
+        <div class="user-info">
+            <label>昵称: </label>
+            <input type="text" id="player-name" placeholder="输入昵称" maxlength="12">
+        </div>
+
+        <div class="game-list">
+            <div class="game-card" data-game="weiqi">
+                <div class="game-icon">⚫</div>
+                <h3>围棋</h3>
+                <p>2人对弈</p>
+            </div>
+            <div class="game-card" data-game="gomoku">
+                <div class="game-icon">⬤</div>
+                <h3>五子棋</h3>
+                <p>2人对弈</p>
+            </div>
+            <div class="game-card" data-game="chess">
+                <div class="game-icon">♞</div>
+                <h3>中国象棋</h3>
+                <p>2人对弈</p>
+            </div>
+            <div class="game-card" data-game="doudizhu">
+                <div class="game-icon">🃏</div>
+                <h3>斗地主</h3>
+                <p>3人对弈</p>
+            </div>
+        </div>
+
+        <!-- 房间列表弹窗 -->
+        <div id="room-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modal-title">房间列表</h3>
+                    <button id="close-modal">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="room-actions">
+                        <button id="create-room" class="btn-primary">创建房间</button>
+                        <button id="refresh-rooms" class="btn-secondary">刷新列表</button>
+                    </div>
+                    <div id="room-list" class="room-list">
+                        <p class="empty-tip">暂无房间，点击"创建房间"开始游戏</p>
+                    </div>
+                    <div class="join-room">
+                        <input type="text" id="room-id-input" placeholder="输入房间号">
+                        <button id="join-by-id">加入</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/lobby.js"></script>
+</body>
+</html>

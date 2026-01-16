@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>围棋入门</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>围棋入门</h1>
+
+        <div class="game-area">
+            <div class="board-container">
+                <canvas id="board"></canvas>
+            </div>
+
+            <div class="control-panel">
+                <div class="info-panel">
+                    <div class="current-player">
+                        <span>当前: </span>
+                        <span id="current-color" class="stone black"></span>
+                        <span id="current-text">黑方</span>
+                    </div>
+                    <div class="captures">
+                        <div>黑方提子: <span id="black-captures">0</span></div>
+                        <div>白方提子: <span id="white-captures">0</span></div>
+                    </div>
+                </div>
+
+                <div class="settings">
+                    <div class="setting-group">
+                        <label>游戏模式:</label>
+                        <select id="game-mode">
+                            <option value="pvp">双人对弈</option>
+                            <option value="pve-black">人机对弈 (执黑)</option>
+                            <option value="pve-white">人机对弈 (执白)</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label>棋盘大小:</label>
+                        <select id="board-size">
+                            <option value="9">9×9</option>
+                            <option value="13">13×13</option>
+                            <option value="19" selected>19×19</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="buttons">
+                    <button id="new-game">新游戏</button>
+                    <button id="undo">悔棋</button>
+                    <button id="pass">停一手</button>
+                    <button id="resign">认输</button>
+                </div>
+
+                <button id="ask-teacher" class="teacher-btn">请求指导</button>
+
+                <div class="bottom-buttons">
+                    <button id="toggle-settings">设置</button>
+                    <button id="toggle-rules">规则说明</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 指导面板 -->
+        <div id="teacher-panel" class="teacher-panel hidden">
+            <div class="teacher-header">
+                <h3>AI指导</h3>
+                <button id="close-teacher">×</button>
+            </div>
+            <div id="teacher-content" class="teacher-content">
+                <p class="placeholder">点击"请求指导"获取AI分析和建议</p>
+            </div>
+        </div>
+
+        <!-- 设置弹窗 -->
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>设置</h3>
+                    <button id="close-settings">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-group">
+                        <label>DeepSeek API密钥:</label>
+                        <input type="password" id="api-key" placeholder="sk-...">
+                        <small>密钥保存在本地浏览器，不会上传</small>
+                    </div>
+                    <div class="setting-group">
+                        <label>AI难度:</label>
+                        <select id="ai-difficulty">
+                            <option value="easy">简单 - 适合入门</option>
+                            <option value="medium" selected>中等 - 有一定挑战</option>
+                            <option value="hard">困难 - 较强对手</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label>显示选项:</label>
+                        <div class="display-options">
+                            <label><input type="checkbox" id="show-liberties"> 显示气</label>
+                            <label><input type="checkbox" id="show-influence"> 显示势力</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="save-settings">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 规则面板 -->
+        <div id="rules-panel" class="rules-panel hidden">
+            <h3>围棋基本规则</h3>
+            <ul>
+                <li><strong>目标:</strong> 围取比对方更多的地盘（目）</li>
+                <li><strong>落子:</strong> 黑先白后，轮流在交叉点上落子</li>
+                <li><strong>气:</strong> 棋子相邻的空交叉点称为"气"，连在一起的棋子共享气</li>
+                <li><strong>提子:</strong> 当一块棋的气被完全堵住（气=0）时，这块棋被提走</li>
+                <li><strong>禁止自杀:</strong> 不能下在会让自己棋子没有气的位置（除非能提掉对方的子）</li>
+                <li><strong>打劫:</strong> 不能立即回提刚被提走的一子（需要在别处下一手后才能回提）</li>
+                <li><strong>胜负:</strong> 双方都停一手后结束，数目多者胜</li>
+            </ul>
+            <h4>气与势的显示</h4>
+            <ul>
+                <li><strong>气:</strong> 在设置中开启后，显示每个棋群的气数（红色=危险，橙色=警告，绿色=安全）</li>
+                <li><strong>势:</strong> 在设置中开启后，用颜色显示双方的势力范围</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="js/game.js"></script>
+    <script src="js/board.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/ui.js"></script>
+</body>
+</html>

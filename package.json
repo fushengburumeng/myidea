@@ -1,0 +1,13 @@
+{
+  "name": "game-platform",
+  "version": "1.0.0",
+  "description": "多人在线游戏平台 - 围棋、五子棋、中国象棋、斗地主",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.14.2",
+    "express": "^4.18.2"
+  }
+}
