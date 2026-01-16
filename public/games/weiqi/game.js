@@ -175,22 +175,72 @@
 
     function evaluateMove(x, y) {
         let score = 0;
-        // 吃子
+
+        // 吃子（高优先级）
         board[x][y] = 2;
         for (const [nx, ny] of getNeighbors(x, y)) {
-            if (board[nx][ny] === 1 && getGroup(nx, ny).liberties.length === 0) score += 50;
+            if (board[nx][ny] === 1) {
+                const g = getGroup(nx, ny);
+                if (g.liberties.length === 0) score += 100;  // 能吃子
+                else if (g.liberties.length === 1) score += 40;  // 能叫吃
+            }
         }
         board[x][y] = 0;
-        // 防守
+
+        // 防守己方棋子
         for (const [nx, ny] of getNeighbors(x, y)) {
             if (board[nx][ny] === 2) {
                 const g = getGroup(nx, ny);
-                if (g.liberties.length <= 2) score += 30;
+                if (g.liberties.length === 1) score += 80;  // 救己方被叫吃的棋
+                else if (g.liberties.length === 2) score += 20;
             }
         }
-        // 中心偏好
-        const center = size / 2;
-        score += Math.max(0, 10 - Math.abs(x - center) - Math.abs(y - center));
+
+        // 开局优先占角和星位
+        const totalStones = board.flat().filter(c => c !== 0).length;
+        if (totalStones < 20) {
+            // 星位加分 (3,3), (3,9), (3,15), (9,3), (9,15), (15,3), (15,9), (15,15)
+            const starPoints = [[3,3],[3,9],[3,15],[9,3],[9,15],[15,3],[15,9],[15,15]];
+            for (const [sx, sy] of starPoints) {
+                if (x === sx && y === sy) score += 25;
+            }
+            // 小目位置加分
+            const komokuPoints = [[2,3],[3,2],[2,15],[3,16],[15,2],[16,3],[15,16],[16,15]];
+            for (const [kx, ky] of komokuPoints) {
+                if (x === kx && y === ky) score += 20;
+            }
+            // 角部区域加分
+            const cornerDist = Math.min(
+                Math.min(x, size - 1 - x),
+                Math.min(y, size - 1 - y)
+            );
+            if (cornerDist <= 4) score += (5 - cornerDist) * 3;
+        }
+
+        // 中盘：靠近己方棋子扩展势力
+        if (totalStones >= 10) {
+            for (const [nx, ny] of getNeighbors(x, y)) {
+                if (board[nx][ny] === 2) score += 5;  // 连接己方
+                if (board[nx][ny] === 1) score += 3;  // 靠近对方（攻击）
+            }
+            // 跳的位置（距离2）
+            const jumps = [[0,2],[0,-2],[2,0],[-2,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+            for (const [dx, dy] of jumps) {
+                const nx = x + dx, ny = y + dy;
+                if (nx >= 0 && nx < size && ny >= 0 && ny < size && board[nx][ny] === 2) {
+                    score += 8;
+                }
+            }
+        }
+
+        // 避免下在边角的第一二线（除非有战术目的）
+        const edgeDist = Math.min(x, y, size - 1 - x, size - 1 - y);
+        if (edgeDist === 0) score -= 10;
+        else if (edgeDist === 1) score -= 5;
+
+        // 轻微的随机性，避免走法过于固定
+        score += Math.random() * 3;
+
         return score;
     }
 

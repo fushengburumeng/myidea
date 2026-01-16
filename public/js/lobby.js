@@ -96,6 +96,7 @@
         if (!playerName) {
             playerName = '玩家' + Math.floor(Math.random() * 1000);
             playerNameInput.value = playerName;
+            localStorage.setItem('playerName', playerName);
         }
         ws.send(JSON.stringify({ type: 'setName', name: playerName }));
         ws.send(JSON.stringify({ type: 'joinRoom', roomId }));
@@ -133,6 +134,7 @@
         if (!playerName) {
             playerName = '玩家' + Math.floor(Math.random() * 1000);
             playerNameInput.value = playerName;
+            localStorage.setItem('playerName', playerName);
         }
         ws.send(JSON.stringify({ type: 'setName', name: playerName }));
         ws.send(JSON.stringify({ type: 'createRoom', gameType: currentGame }));
