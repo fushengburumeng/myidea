@@ -13,8 +13,8 @@ class EngineManager {
         this.katagoLastUsed = 0;
         this.pikafishLastUsed = 0;
 
-        // 空闲60秒后关闭引擎（节省服务器资源）
-        this.idleTimeout = 60000;
+        // 空闲300秒（5分钟）后关闭引擎，防止AI思考时被误判为空闲
+        this.idleTimeout = 300000;
 
         // 请求队列（避免并发问题）
         this.katagoQueue = [];

@@ -108,10 +108,11 @@ class KataGoAdapter {
      */
     async sendCommand(command) {
         return new Promise((resolve, reject) => {
+            // 增加超时时间到60秒，防止AI思考时间过长导致超时
             const timeout = setTimeout(() => {
                 this.pendingCallback = null;
                 reject(new Error('命令响应超时: ' + command));
-            }, 30000);
+            }, 60000);
 
             this.pendingCallback = (response) => {
                 clearTimeout(timeout);
@@ -121,6 +122,13 @@ class KataGoAdapter {
                     resolve(response.result);
                 }
             };
+
+            // 检查stdin是否可写，防止EPIPE错误
+            if (!this.process || !this.process.stdin.writable) {
+                clearTimeout(timeout);
+                reject(new Error('引擎进程stdin不可写'));
+                return;
+            }
 
             this.send(command);
         });

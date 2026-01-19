@@ -24,38 +24,35 @@
         chmod +x pikafish
     
     # --- 第二阶段：应用运行阶段 ---
-    # 修改点：改用 debian 基础镜像
-    FROM node:18-bullseye-slim
-    
+    # 修改点：升级到 bookworm 以支持 GLIBC 2.34+
+    FROM node:18-bookworm-slim
+
     WORKDIR /app
-    
-    # 安装运行时核心依赖 (Debian 系)
+
+    # 安装运行时核心依赖 (补全所有必需依赖)
     RUN apt-get update && apt-get install -y --no-install-recommends \
         wget \
         libzip4 \
         libgomp1 \
+        libatomic1 \
         ca-certificates \
         && rm -rf /var/lib/apt/lists/*
-    
-    # 关键：手动补齐 libssl1.1 (Debian Bullseye 自带 libssl1.1，如果是更高版本则需要手动下载)
-    # Bullseye 默认自带 libssl1.1，如果是 Debian 12 (bookworm) 才需要手动下包。
-    # 为了保险，我们强制检查并建立软链接解决 libzip.so.5 的问题
-    RUN ln -s /usr/lib/x86_64-linux-gnu/libzip.so.4 /usr/lib/x86_64-linux-gnu/libzip.so.5 || true
-    
+
     # 复制项目文件
     COPY package*.json ./
     RUN npm install --production
     COPY . .
-    
+
     # 从下载阶段复制 AI 引擎
     COPY --from=downloader /engines /app/ai/bin
-    
-    # 赋予执行权限
-    RUN chmod +x /app/ai/bin/katago/katago /app/ai/bin/pikafish/pikafish
-    
+
+    # 赋予执行权限并确保日志目录可写
+    RUN chmod +x /app/ai/bin/katago/katago /app/ai/bin/pikafish/pikafish && \
+        chmod -R 777 /app
+
     EXPOSE 9527
-    
+
     # 启动前简单的自检逻辑
     RUN /app/ai/bin/katago/katago version && /app/ai/bin/pikafish/pikafish uci quit
-    
+
     CMD ["node", "server.js"]
