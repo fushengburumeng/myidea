@@ -1,97 +1,61 @@
-# 多阶段构建 - AI引擎下载阶段
-FROM alpine:3.19 AS downloader
-
-WORKDIR /tmp
-
-# 安装下载工具和依赖
-RUN apk add --no-cache wget unzip curl
-
-# 下载 KataGo（尝试多个版本）
-RUN mkdir -p /engines/katago && \
-    cd /engines/katago && \
-    echo "正在下载 KataGo..." && \
-    (wget --timeout=60 --tries=3 --retry-connrefused \
-        https://github.com/lightvector/KataGo/releases/download/v1.15.3/katago-v1.15.3-linux-x64.zip \
-        -O katago.zip 2>/dev/null || \
-     wget --timeout=60 --tries=3 --retry-connrefused \
-        https://github.com/lightvector/KataGo/releases/download/v1.15.0/katago-v1.15.0-linux-x64.zip \
-        -O katago.zip 2>/dev/null || \
-     wget --timeout=60 --tries=3 --retry-connrefused \
-        https://github.com/lightvector/KataGo/releases/download/v1.14.0/katago-v1.14.0-linux-x64.zip \
-        -O katago.zip) && \
-    echo "解压 KataGo..." && \
-    unzip -q katago.zip && \
-    rm katago.zip && \
-    chmod +x katago && \
-    echo "KataGo 下载完成"
-
-# 下载 KataGo 模型 (b6 小模型)
-RUN cd /engines/katago && \
-    echo "正在下载 KataGo 模型..." && \
-    wget --timeout=60 --tries=3 --retry-connrefused \
-        https://github.com/lightvector/KataGo/releases/download/v1.4.5/g170e-b6c96-s175395328-d26788732.bin.gz \
-        -O b6.bin.gz && \
-    echo "模型下载完成"
-
-# 创建 KataGo 配置文件
-RUN cd /engines/katago && \
-    echo "logSearchInfo = false" > config.cfg && \
-    echo "logToStderr = false" >> config.cfg && \
-    echo "maxVisits = 100" >> config.cfg && \
-    echo "numSearchThreads = 1" >> config.cfg
-
-# 下载 Pikafish
-RUN mkdir -p /engines/pikafish && \
-    cd /engines/pikafish && \
-    echo "正在下载 Pikafish..." && \
-    wget --timeout=60 --tries=3 --retry-connrefused \
-        https://github.com/official-pikafish/Pikafish/releases/latest/download/pikafish-bmi2 \
-        -O pikafish && \
-    chmod +x pikafish && \
-    echo "Pikafish 下载完成"
-
-# 验证下载的文件
-RUN echo "验证引擎文件..." && \
-    ls -lh /engines/katago/ && \
-    ls -lh /engines/pikafish/ && \
-    test -f /engines/katago/katago && \
-    test -f /engines/katago/b6.bin.gz && \
-    test -f /engines/pikafish/pikafish && \
-    echo "所有引擎文件验证通过"
-
-# 应用构建阶段
-FROM node:18-alpine
-
-WORKDIR /app
-
-# 安装运行时依赖（KataGo 和 Pikafish 需要）
-RUN apk add --no-cache libstdc++ libgomp
-
-# 复制 package.json 并安装依赖
-COPY package*.json ./
-RUN npm install --production
-
-# 复制应用代码
-COPY . .
-
-# 从下载阶段复制 AI 引擎
-COPY --from=downloader /engines /app/ai/bin
-
-# 验证引擎文件
-RUN echo "验证引擎文件已复制..." && \
-    ls -lh /app/ai/bin/katago/ && \
-    ls -lh /app/ai/bin/pikafish/ && \
-    test -x /app/ai/bin/katago/katago && \
-    test -f /app/ai/bin/katago/b6.bin.gz && \
-    test -x /app/ai/bin/pikafish/pikafish && \
-    echo "AI引擎文件验证通过"
-
-# 暴露端口
-EXPOSE 9527
-
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:9527', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
-
-# 启动应用
-CMD ["node", "server.js"]
+# --- 第一阶段：下载阶段 ---
+    FROM alpine:3.19 AS downloader
+    WORKDIR /tmp
+    RUN apk add --no-cache wget unzip curl
+    # (这部分保持你原来的下载逻辑即可，Alpine 用于下载是没有问题的)
+    RUN mkdir -p /engines/katago /engines/pikafish
+    
+    # KataGo 下载逻辑 (建议使用你手动确认成功的链接，或者保留原样)
+    RUN cd /engines/katago && \
+        wget https://github.com/lightvector/KataGo/releases/download/v1.15.3/katago-v1.15.3-eigenavx2-linux-x64.zip -O katago.zip && \
+        unzip -q katago.zip && rm katago.zip && chmod +x katago
+    
+    # 模型下载
+    RUN cd /engines/katago && \
+        wget https://github.com/lightvector/KataGo/releases/download/v1.4.5/g170e-b6c96-s175395328-d26788732.bin.gz -O b6.bin.gz
+    
+    # 配置文件
+    RUN cd /engines/katago && \
+        echo "logSearchInfo = false\nlogToStderr = false\nmaxVisits = 100\nnumSearchThreads = 1" > config.cfg
+    
+    # Pikafish 下载 (建议用 avx2 替代 bmi2 提高兼容性)
+    RUN cd /engines/pikafish && \
+        wget https://github.com/official-pikafish/Pikafish/releases/latest/download/pikafish-avx2 -O pikafish && \
+        chmod +x pikafish
+    
+    # --- 第二阶段：应用运行阶段 ---
+    # 修改点：改用 debian 基础镜像
+    FROM node:18-bullseye-slim
+    
+    WORKDIR /app
+    
+    # 安装运行时核心依赖 (Debian 系)
+    RUN apt-get update && apt-get install -y --no-install-recommends \
+        wget \
+        libzip4 \
+        libgomp1 \
+        ca-certificates \
+        && rm -rf /var/lib/apt/lists/*
+    
+    # 关键：手动补齐 libssl1.1 (Debian Bullseye 自带 libssl1.1，如果是更高版本则需要手动下载)
+    # Bullseye 默认自带 libssl1.1，如果是 Debian 12 (bookworm) 才需要手动下包。
+    # 为了保险，我们强制检查并建立软链接解决 libzip.so.5 的问题
+    RUN ln -s /usr/lib/x86_64-linux-gnu/libzip.so.4 /usr/lib/x86_64-linux-gnu/libzip.so.5 || true
+    
+    # 复制项目文件
+    COPY package*.json ./
+    RUN npm install --production
+    COPY . .
+    
+    # 从下载阶段复制 AI 引擎
+    COPY --from=downloader /engines /app/ai/bin
+    
+    # 赋予执行权限
+    RUN chmod +x /app/ai/bin/katago/katago /app/ai/bin/pikafish/pikafish
+    
+    EXPOSE 9527
+    
+    # 启动前简单的自检逻辑
+    RUN /app/ai/bin/katago/katago version && /app/ai/bin/pikafish/pikafish uci quit
+    
+    CMD ["node", "server.js"]
