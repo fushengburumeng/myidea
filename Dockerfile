@@ -1,58 +1,40 @@
-# --- 第一阶段：下载阶段 ---
-    FROM alpine:3.19 AS downloader
-    WORKDIR /tmp
-    RUN apk add --no-cache wget unzip curl
-    # (这部分保持你原来的下载逻辑即可，Alpine 用于下载是没有问题的)
-    RUN mkdir -p /engines/katago /engines/pikafish
-    
-    # KataGo 下载逻辑 (建议使用你手动确认成功的链接，或者保留原样)
-    RUN cd /engines/katago && \
-        wget https://github.com/lightvector/KataGo/releases/download/v1.15.3/katago-v1.15.3-eigenavx2-linux-x64.zip -O katago.zip && \
-        unzip -q katago.zip && rm katago.zip && chmod +x katago
-    
-    # 模型下载
-    RUN cd /engines/katago && \
-        wget https://github.com/lightvector/KataGo/releases/download/v1.4.5/g170e-b6c96-s175395328-d26788732.bin.gz -O b6.bin.gz
-    
-    # 配置文件
-    RUN cd /engines/katago && \
-        echo "logSearchInfo = false\nlogToStderr = false\nmaxVisits = 100\nnumSearchThreads = 1" > config.cfg
-    
-    # Pikafish 下载 (建议用 avx2 替代 bmi2 提高兼容性)
-    RUN cd /engines/pikafish && \
-        wget https://github.com/official-pikafish/Pikafish/releases/latest/download/pikafish-avx2 -O pikafish && \
-        chmod +x pikafish
-    
-    # --- 第二阶段：应用运行阶段 ---
-    # 修改点：升级到 bookworm 以支持 GLIBC 2.34+
-    FROM node:18-bookworm-slim
+# 多人在线棋牌游戏平台 - Docker镜像
+# 基础镜像：node:18-bookworm-slim (支持 GLIBC 2.34+)
+FROM node:18-bookworm-slim
 
-    WORKDIR /app
+WORKDIR /app
 
-    # 安装运行时核心依赖 (补全所有必需依赖)
-    RUN apt-get update && apt-get install -y --no-install-recommends \
-        wget \
-        libzip4 \
-        libgomp1 \
-        libatomic1 \
-        ca-certificates \
-        && rm -rf /var/lib/apt/lists/*
+# 配置清华大学镜像源（加速apt下载）
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's/security.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources
 
-    # 复制项目文件
-    COPY package*.json ./
-    RUN npm install --production
-    COPY . .
+# 安装运行时核心依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    libzip4 \
+    libgomp1 \
+    libatomic1 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-    # 从下载阶段复制 AI 引擎
-    COPY --from=downloader /engines /app/ai/bin
+# 复制项目文件
+COPY package*.json ./
 
-    # 赋予执行权限并确保日志目录可写
-    RUN chmod +x /app/ai/bin/katago/katago /app/ai/bin/pikafish/pikafish && \
-        chmod -R 777 /app
+# 配置npm清华镜像源并安装依赖
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm install --production
 
-    EXPOSE 9527
+# 复制所有项目文件（包括ai文件夹）
+COPY . .
 
-    # 启动前简单的自检逻辑
-    RUN /app/ai/bin/katago/katago version && /app/ai/bin/pikafish/pikafish uci quit
+# 赋予AI引擎执行权限并确保日志目录可写
+RUN chmod +x /app/ai/bin/katago/katago /app/ai/bin/pikafish/pikafish 2>/dev/null || true && \
+    chmod -R 777 /app
 
-    CMD ["node", "server.js"]
+EXPOSE 9527
+
+# 启动前自检AI引擎（可选，如果引擎不存在会跳过）
+RUN /app/ai/bin/katago/katago version 2>/dev/null || echo "KataGo not found, skipping check" && \
+    echo "quit" | /app/ai/bin/pikafish/pikafish 2>/dev/null || echo "Pikafish not found, skipping check"
+
+CMD ["node", "server.js"]

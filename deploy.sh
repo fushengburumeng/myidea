@@ -49,22 +49,35 @@ docker stop $APP_NAME 2>/dev/null || true
 docker rm $APP_NAME 2>/dev/null || true
 echo "✓ 旧容器已清理"
 
+# 检查AI引擎文件
+echo ""
+echo "[2/5] 检查AI引擎文件..."
+if [ ! -f "ai/bin/katago/katago" ] && [ ! -f "ai/bin/katago/katago.exe" ]; then
+    echo "⚠ 警告: KataGo引擎文件不存在"
+    echo "请参考 ai/README.md 下载并放置AI引擎文件"
+fi
+if [ ! -f "ai/bin/pikafish/pikafish" ] && [ ! -f "ai/bin/pikafish/pikafish.exe" ]; then
+    echo "⚠ 警告: Pikafish引擎文件不存在"
+    echo "请参考 ai/README.md 下载并放置AI引擎文件"
+fi
+echo "✓ AI引擎检查完成"
+
 # 构建镜像
 echo ""
-echo "[2/4] 构建 Docker 镜像（包含AI引擎）..."
-echo "注意：首次构建会下载AI引擎，可能需要5-10分钟"
+echo "[3/5] 构建 Docker 镜像（使用清华镜像源）..."
+echo "注意：使用本地AI引擎文件，无需下载"
 docker build -t $IMAGE_NAME . --no-cache
 echo "✓ 镜像构建完成"
 
 # 创建日志目录
 echo ""
-echo "[3/4] 创建日志目录..."
+echo "[4/5] 创建日志目录..."
 mkdir -p logs
 echo "✓ 日志目录已创建"
 
 # 启动容器
 echo ""
-echo "[4/4] 启动容器..."
+echo "[5/5] 启动容器..."
 docker run -d \
     -p $PORT:$PORT \
     --name $APP_NAME \
