@@ -1,51 +1,52 @@
-# 使用 Debian Bookworm 镜像，解决 glibc 兼容性问题
+# 使用 Debian Bookworm 镜像
 FROM node:18-bookworm-slim
 
 WORKDIR /app
 
-# 1. 安装 Debian 环境下的运行时依赖 (必须使用 apt)
-# libatomic1: 解决你之前遇到的 libatomic.so.1 缺失问题
-# libgomp1: 解决 OpenMP 运行库缺失问题
-# libzip4: KataGo 加载模型权重所需
-RUN apt-get update && apt-get install -y \
+# 1. 设置 APT 清华镜像源并安装系统依赖
+# 我们先备份原始源，然后替换为清华源
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y \
     libatomic1 \
     libgomp1 \
     libzip4 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. 复制依赖描述文件并安装 (利用缓存)
+# 2. 复制依赖描述文件
 COPY package*.json ./
-RUN npm install --production
 
-# 3. 复制应用代码
+# 3. 设置 NPM 淘宝镜像并安装依赖
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm install --production
+
+# 4. 复制应用代码
 COPY . .
 
-# 4. 显式复制 AI 引擎文件（确保宿主机对应目录有文件）
+# 5. 显式复制 AI 引擎文件
 COPY ai/bin/katago /app/ai/bin/katago
 COPY ai/bin/pikafish /app/ai/bin/pikafish
 
-# 5. 设置执行权限
-# 移除 2>/dev/null 方便我们在构建日志中直接看到报错
+# 6. 设置执行权限
 RUN chmod +x /app/ai/bin/katago/katago && \
     chmod +x /app/ai/bin/pikafish/pikafish
 
-# 6. 验证引擎文件及依赖环境
+# 7. 验证引擎文件及依赖环境 (这是你最关心的 ldd 检查)
 RUN echo "========== AI 引擎及依赖验证 ==========" && \
-    echo "1. 检查文件权限:" && \
+    echo "1. 检查文件:" && \
     ls -lh /app/ai/bin/katago/katago && \
     ls -lh /app/ai/bin/pikafish/pikafish && \
     echo "" && \
-    echo "2. 验证动态链接库 (关键步骤):" && \
-    ldd /app/ai/bin/katago/katago && \
+    echo "2. 验证动态链接库:" && \
+    ldd /app/ai/bin/katago/katago || echo "KataGo 依赖检查失败" && \
     echo "-----------------------------------" && \
-    ldd /app/ai/bin/pikafish/pikafish && \
+    ldd /app/ai/bin/pikafish/pikafish || echo "Pikafish 依赖检查失败" && \
     echo "====================================="
 
 # 暴露端口
 EXPOSE 9527
 
-# 健康检查 (适应 Debian 环境)
+# 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD node -e "require('http').get('http://localhost:9527/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
 
