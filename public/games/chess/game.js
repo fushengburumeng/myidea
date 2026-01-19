@@ -239,7 +239,9 @@
             if (y < rows - 1) fen += '/';
         }
 
-        // 添加当前玩家 (w=红方, b=黑方)
+        // 添加当前玩家 (w=红方先行, b=黑方先行)
+        // currentPlayer: 0=红方, 1=黑方
+        // 修复：红方走完后应该是黑方(b)，黑方走完后应该是红方(w)
         fen += currentPlayer === 0 ? ' w' : ' b';
         fen += ' - - 0 1';
 
@@ -350,6 +352,9 @@
             addChatMessage('系统', 'AI思考中...');
 
             const fen = boardToFen();
+            console.log('[doAiMove] 发送FEN给AI:', fen);
+            console.log('[doAiMove] 当前玩家:', currentPlayer, '(0=红方, 1=黑方)');
+
             ws.send(JSON.stringify({
                 type: 'aiRequest',
                 game: 'chess',
@@ -372,13 +377,39 @@
     }
 
     function executeAiMove(move) {
+        // 验证AI返回的坐标是否合法
+        if (!move || move.fromX === undefined || move.fromY === undefined ||
+            move.toX === undefined || move.toY === undefined) {
+            console.error('[executeAiMove] 无效的移动数据:', move);
+            aiThinking = false;
+            addChatMessage('系统', 'AI返回了无效的移动');
+            return;
+        }
+
+        console.log('[executeAiMove] AI移动:', move);
         const piece = board[move.fromY][move.fromX];
+        console.log('[executeAiMove] 移动的棋子:', piece, '(负数=黑方, 正数=红方)');
+
+        // 验证移动的棋子是否属于黑方（AI）
+        if (piece >= 0) {
+            console.error('[executeAiMove] AI尝试移动红方棋子:', piece, move);
+            aiThinking = false;
+            addChatMessage('系统', 'AI移动错误：尝试移动红方棋子');
+            return;
+        }
+
         const captured = board[move.toY][move.toX];
+
+        // 执行移动
         board[move.toY][move.toX] = piece;
         board[move.fromY][move.fromX] = 0;
+
+        // 切换回红方
         currentPlayer = 0;
         selectedPiece = null;
         aiThinking = false;
+
+        console.log('[executeAiMove] AI移动完成，切换到红方');
         draw();
         updateStatus();
 
@@ -688,7 +719,8 @@
     }
 
     canvas.addEventListener('click', (e) => {
-        if (!gameStarted || mySeat !== currentPlayer) return;
+        // AI思考时禁止玩家操作
+        if (!gameStarted || mySeat !== currentPlayer || aiThinking) return;
 
         const rect = canvas.getBoundingClientRect();
         const pos = toBoard(e.clientX - rect.left, e.clientY - rect.top);
