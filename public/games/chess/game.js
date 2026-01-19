@@ -15,6 +15,9 @@
     let board = [];
     let selectedPiece = null;
     let aiThinking = false; // AI思考中标志
+    let lastActionTime = Date.now(); // 最后操作时间
+    let inactivityTimer = null; // 无操作计时器
+    const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5分钟
 
     const cellWidth = 50;
     const cellHeight = 50;
@@ -58,6 +61,31 @@
         readyBtn.style.display = 'none';
         updateStatus();
         addChatMessage('系统', '游戏开始！你执红先行');
+        startInactivityTimer();
+    }
+
+    // 无操作计时器
+    function startInactivityTimer() {
+        if (!isAiMode || !gameStarted) return;
+
+        clearTimeout(inactivityTimer);
+        inactivityTimer = setTimeout(() => {
+            if (gameStarted) {
+                addChatMessage('系统', '5分钟无操作，游戏自动结束');
+                gameStarted = false;
+                if (ws) {
+                    ws.close();
+                }
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+            }
+        }, INACTIVITY_TIMEOUT);
+    }
+
+    function resetInactivityTimer() {
+        lastActionTime = Date.now();
+        startInactivityTimer();
     }
 
     function initBoard() {
@@ -443,12 +471,14 @@
         selectedPiece = null;
         draw();
         updateStatus();
+        resetInactivityTimer(); // 重置计时器
 
         // 检查是否吃掉了将
         if (captured === -5) {
             addChatMessage('系统', '游戏结束！红方获胜');
             showGameEndEffect(true, '你赢了！');
             gameStarted = false;
+            clearTimeout(inactivityTimer);
             return true;
         }
 
@@ -539,6 +569,7 @@
             case 'gameOver':
                 gameStarted = false;
                 readyBtn.disabled = false;
+                clearTimeout(inactivityTimer); // 清除计时器
                 const chessWinnerName = msg.winner === 0 ? '红方' : '黑方';
                 const chessIsWinner = msg.winner === mySeat;
                 addChatMessage('系统', `游戏结束！${chessWinnerName}获胜`);
@@ -547,31 +578,43 @@
             case 'gameEnded':
                 gameStarted = false;
                 readyBtn.disabled = false;
+                clearTimeout(inactivityTimer); // 清除计时器
                 addChatMessage('系统', `游戏结束：${msg.reason}`);
                 break;
             case 'chat':
                 addChatMessage(msg.name, msg.text);
                 break;
             case 'leftRoom':
+                clearTimeout(inactivityTimer); // 清除计时器
                 window.location.href = '/';
                 break;
             case 'aiResponse':
                 if (msg.game === 'chess' && msg.move) {
                     aiThinking = false;
+                    // 显示AI类型提示
+                    if (msg.usingEngine) {
+                        addChatMessage('系统', 'AI引擎已响应');
+                    } else {
+                        addChatMessage('系统', '使用本地AI（引擎繁忙）');
+                    }
                     executeAiMove(msg.move);
                 }
                 break;
             case 'aiError':
                 aiThinking = false;
-                addChatMessage('系统', `AI错误: ${msg.message}，使用本地AI`);
-                useServerAi = false;
-                // 使用本地AI重试
-                setTimeout(() => {
-                    const move = aiMove();
-                    if (move) {
-                        executeAiMove(move);
-                    }
-                }, 500);
+                if (msg.useLocalAi) {
+                    addChatMessage('系统', msg.message + '，切换到本地AI');
+                    useServerAi = false;
+                    // 使用本地AI重试
+                    setTimeout(() => {
+                        const move = aiMove();
+                        if (move) {
+                            executeAiMove(move);
+                        }
+                    }, 500);
+                } else {
+                    addChatMessage('系统', 'AI引擎错误: ' + msg.message);
+                }
                 break;
             case 'error':
                 alert(msg.message);
@@ -579,6 +622,7 @@
                     // 收到错误后返回大厅，避免重连循环
                     ws.onclose = null;
                     ws.close();
+                    clearTimeout(inactivityTimer); // 清除计时器
                     window.location.href = '/';
                 }
                 break;
@@ -766,7 +810,11 @@
     });
 
     leaveBtn.addEventListener('click', () => {
+        clearTimeout(inactivityTimer); // 清除计时器
         if (isAiMode) {
+            if (ws) {
+                ws.close();
+            }
             window.location.href = '/';
         } else {
             ws.send(JSON.stringify({ type: 'leaveRoom' }));

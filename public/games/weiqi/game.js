@@ -14,6 +14,9 @@
     let board = [];
     let captures = [0, 0];
     let moveHistory = []; // 记录历史着法
+    let lastActionTime = Date.now(); // 最后操作时间
+    let inactivityTimer = null; // 无操作计时器
+    const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5分钟
     const size = 19;
     const cellSize = 28;
     const padding = 20;
@@ -60,10 +63,35 @@
         passBtn.disabled = false;
         updateStatus();
         addChatMessage('系统', '游戏开始！你执黑先行');
+        startInactivityTimer();
     } else {
         // 双人对战模式隐藏AI难度设置
         const aiDifficultyItem = aiDifficultyEl.closest('.setting-item');
         if (aiDifficultyItem) aiDifficultyItem.style.display = 'none';
+    }
+
+    // 无操作计时器
+    function startInactivityTimer() {
+        if (!isAiMode || !gameStarted) return;
+
+        clearTimeout(inactivityTimer);
+        inactivityTimer = setTimeout(() => {
+            if (gameStarted) {
+                addChatMessage('系统', '5分钟无操作，游戏自动结束');
+                gameStarted = false;
+                if (aiWs) {
+                    aiWs.close();
+                }
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+            }
+        }, INACTIVITY_TIMEOUT);
+    }
+
+    function resetInactivityTimer() {
+        lastActionTime = Date.now();
+        startInactivityTimer();
     }
 
     // 设置面板
@@ -278,6 +306,13 @@
 
     // 处理服务端AI响应
     function handleAiResponse(msg) {
+        // 显示AI类型提示
+        if (msg.usingEngine) {
+            addChatMessage('系统', 'AI引擎已响应');
+        } else {
+            addChatMessage('系统', '使用本地AI（引擎繁忙）');
+        }
+
         if (msg.move === 'pass') {
             addChatMessage('AI', '停一手');
         } else {
@@ -305,9 +340,13 @@
             if (msg.type === 'aiResponse' && msg.game === 'weiqi') {
                 handleAiResponse(msg);
             } else if (msg.type === 'aiError') {
-                addChatMessage('系统', 'AI引擎错误: ' + msg.message + '，使用本地AI');
-                useServerAi = false;
-                doAiMove();
+                if (msg.useLocalAi) {
+                    addChatMessage('系统', msg.message + '，切换到本地AI');
+                    useServerAi = false;
+                    doAiMove();
+                } else {
+                    addChatMessage('系统', 'AI引擎错误: ' + msg.message);
+                }
             }
         };
 
@@ -396,6 +435,7 @@
                 gameStarted = false;
                 readyBtn.disabled = false;
                 passBtn.disabled = true;
+                clearTimeout(inactivityTimer); // 清除计时器
                 const weiqiWinnerName = msg.winner === 0 ? '黑方' : '白方';
                 const weiqiIsWinner = msg.winner === mySeat;
                 addChatMessage('系统', `游戏结束！${weiqiWinnerName}获胜`);
@@ -405,12 +445,14 @@
                 gameStarted = false;
                 readyBtn.disabled = false;
                 passBtn.disabled = true;
+                clearTimeout(inactivityTimer); // 清除计时器
                 addChatMessage('系统', `游戏结束：${msg.reason}`);
                 break;
             case 'chat':
                 addChatMessage(msg.name, msg.text);
                 break;
             case 'leftRoom':
+                clearTimeout(inactivityTimer); // 清除计时器
                 window.location.href = '/';
                 break;
             case 'error':
@@ -418,6 +460,7 @@
                 // 收到错误后返回大厅，避免重连循环
                 ws.onclose = null;
                 ws.close();
+                clearTimeout(inactivityTimer); // 清除计时器
                 window.location.href = '/';
                 break;
         }
@@ -588,6 +631,7 @@
             currentPlayer = 1;
             updateStatus();
             draw();
+            resetInactivityTimer(); // 重置计时器
             doAiMove();
         } else {
             ws.send(JSON.stringify({ type: 'gameAction', action: 'place', x: pos[0], y: pos[1] }));
@@ -604,6 +648,7 @@
                 addChatMessage('你', '停一手');
                 currentPlayer = 1;
                 updateStatus();
+                resetInactivityTimer(); // 重置计时器
                 doAiMove();
             } else {
                 ws.send(JSON.stringify({ type: 'gameAction', action: 'pass' }));
@@ -612,7 +657,11 @@
     });
 
     leaveBtn.addEventListener('click', () => {
+        clearTimeout(inactivityTimer); // 清除计时器
         if (isAiMode) {
+            if (aiWs) {
+                aiWs.close();
+            }
             window.location.href = '/';
         } else {
             ws.send(JSON.stringify({ type: 'leaveRoom' }));

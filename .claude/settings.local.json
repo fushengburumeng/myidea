@@ -14,7 +14,8 @@
       "Bash(chmod:*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(echo:*)"
     ]
   }
 }

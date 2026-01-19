@@ -611,7 +611,7 @@ function handleDisconnect(ws) {
 // 处理AI请求
 async function handleAiRequest(ws, msg) {
     if (!engineManager) {
-        sendTo(ws, { type: 'aiError', message: 'AI引擎未配置' });
+        sendTo(ws, { type: 'aiError', message: 'AI引擎未配置', useLocalAi: true });
         return;
     }
 
@@ -622,7 +622,8 @@ async function handleAiRequest(ws, msg) {
             sendTo(ws, {
                 type: 'aiResponse',
                 game: 'chess',
-                move: move
+                move: move,
+                usingEngine: true
             });
         } else if (msg.game === 'weiqi') {
             // 围棋AI
@@ -632,21 +633,41 @@ async function handleAiRequest(ws, msg) {
             });
 
             if (result.pass) {
-                sendTo(ws, { type: 'aiResponse', game: 'weiqi', move: 'pass' });
+                sendTo(ws, {
+                    type: 'aiResponse',
+                    game: 'weiqi',
+                    move: 'pass',
+                    usingEngine: true
+                });
             } else {
                 sendTo(ws, {
                     type: 'aiResponse',
                     game: 'weiqi',
                     x: result.x,
-                    y: result.y
+                    y: result.y,
+                    usingEngine: true
                 });
             }
         } else {
-            sendTo(ws, { type: 'aiError', message: '不支持的游戏类型' });
+            sendTo(ws, { type: 'aiError', message: '不支持的游戏类型', useLocalAi: true });
         }
     } catch (err) {
         console.error('[AI Error]', err);
-        sendTo(ws, { type: 'aiError', message: err.message || '引擎错误' });
+
+        // 如果是Worker池已满，提示使用本地AI
+        if (err.message === 'POOL_FULL') {
+            sendTo(ws, {
+                type: 'aiError',
+                message: 'AI引擎繁忙，请使用本地AI',
+                useLocalAi: true
+            });
+        } else {
+            sendTo(ws, {
+                type: 'aiError',
+                message: err.message || '引擎错误',
+                useLocalAi: true
+            });
+        }
     }
 }
 
