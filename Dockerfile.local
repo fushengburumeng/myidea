@@ -10,9 +10,13 @@ RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.li
     libatomic1 \
     libgomp1 \
     libzip4 \
+    libcurl4 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-
+# 处理 libzip 版本兼容问题
+RUN if [ -f /usr/lib/x86_64-linux-gnu/libzip.so.4 ]; then \
+    ln -s /usr/lib/x86_64-linux-gnu/libzip.so.4 /usr/lib/x86_64-linux-gnu/libzip.so.5; \
+    fi
 # 2. 复制依赖描述文件
 COPY package*.json ./
 
