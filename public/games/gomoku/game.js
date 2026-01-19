@@ -51,6 +51,19 @@
     }
 
     // ========== AI逻辑 ==========
+    // 棋型分数定义
+    const SCORE = {
+        FIVE: 100000,      // 连五
+        LIVE_FOUR: 10000,  // 活四
+        RUSH_FOUR: 1000,   // 冲四
+        LIVE_THREE: 1000,  // 活三
+        SLEEP_THREE: 100,  // 眠三
+        LIVE_TWO: 100,     // 活二
+        SLEEP_TWO: 10,     // 眠二
+        LIVE_ONE: 10,      // 活一
+        SLEEP_ONE: 1       // 眠一
+    };
+
     function checkWin(x, y) {
         const color = board[x][y];
         const directions = [[1,0],[0,1],[1,1],[1,-1]];
@@ -71,70 +84,262 @@
         return false;
     }
 
-    function evaluateLine(x, y, dx, dy, player) {
-        let count = 0, block = 0, empty = 0;
-        for (let i = 1; i <= 4; i++) {
+    // 分析一条线上的棋型
+    function analyzeLine(x, y, dx, dy, player) {
+        const line = [];
+        // 向两个方向延伸，收集9个位置的信息
+        for (let i = -4; i <= 4; i++) {
             const nx = x + dx * i, ny = y + dy * i;
-            if (nx < 0 || nx >= size || ny < 0 || ny >= size) { block++; break; }
-            if (board[nx][ny] === player) count++;
-            else if (board[nx][ny] === 0) { empty++; break; }
-            else { block++; break; }
+            if (nx >= 0 && nx < size && ny >= 0 && ny < size) {
+                line.push(board[nx][ny]);
+            } else {
+                line.push(-1); // 边界
+            }
         }
-        for (let i = 1; i <= 4; i++) {
-            const nx = x - dx * i, ny = y - dy * i;
-            if (nx < 0 || nx >= size || ny < 0 || ny >= size) { block++; break; }
-            if (board[nx][ny] === player) count++;
-            else if (board[nx][ny] === 0) { empty++; break; }
-            else { block++; break; }
+
+        // 分析棋型
+        let count = 0, block = 0, space = 0;
+        let leftRange = 0, rightRange = 0;
+
+        // 中心点是当前位置
+        const center = 4;
+
+        // 向左统计
+        for (let i = center - 1; i >= 0; i--) {
+            if (line[i] === player) {
+                count++;
+                leftRange++;
+            } else if (line[i] === 0) {
+                if (space === 0) {
+                    space++;
+                    leftRange++;
+                } else {
+                    break;
+                }
+            } else {
+                block++;
+                break;
+            }
         }
-        if (count >= 4) return 10000;
-        if (count === 3 && block === 0) return 1000;
-        if (count === 3 && block === 1) return 100;
-        if (count === 2 && block === 0) return 50;
-        if (count === 2 && block === 1) return 10;
-        if (count === 1 && block === 0) return 5;
-        return 1;
+
+        // 向右统计
+        for (let i = center + 1; i < line.length; i++) {
+            if (line[i] === player) {
+                count++;
+                rightRange++;
+            } else if (line[i] === 0) {
+                if (space === 0) {
+                    space++;
+                    rightRange++;
+                } else {
+                    break;
+                }
+            } else {
+                block++;
+                break;
+            }
+        }
+
+        // 判断棋型
+        if (count >= 4) return SCORE.FIVE;
+
+        if (count === 3) {
+            if (block === 0 && space === 0) return SCORE.LIVE_FOUR; // _XXX_
+            if (block === 1 && space === 0) return SCORE.RUSH_FOUR; // XXXX| 或 |XXXX
+            if (block === 0 && space === 1) return SCORE.LIVE_THREE; // _XX_X_ 或 _X_XX_
+            if (block === 1 && space === 1) return SCORE.SLEEP_THREE;
+        }
+
+        if (count === 2) {
+            if (block === 0 && space === 0) return SCORE.LIVE_THREE; // _XX_
+            if (block === 1 && space === 0) return SCORE.SLEEP_THREE;
+            if (block === 0 && space === 1) return SCORE.LIVE_TWO;
+            if (block === 1 && space === 1) return SCORE.SLEEP_TWO;
+        }
+
+        if (count === 1) {
+            if (block === 0 && space === 0) return SCORE.LIVE_TWO; // _X_
+            if (block === 1 && space === 0) return SCORE.SLEEP_TWO;
+            if (block === 0) return SCORE.LIVE_ONE;
+            return SCORE.SLEEP_ONE;
+        }
+
+        return 0;
     }
 
-    function evaluateMove(x, y) {
+    // 评估某个位置的分数
+    function evaluatePosition(x, y, player) {
         let score = 0;
         const directions = [[1,0],[0,1],[1,1],[1,-1]];
-        // AI进攻
-        board[x][y] = 2;
-        for (const [dx, dy] of directions) score += evaluateLine(x, y, dx, dy, 2) * 1.1;
-        board[x][y] = 0;
-        // 防守
-        board[x][y] = 1;
-        for (const [dx, dy] of directions) score += evaluateLine(x, y, dx, dy, 1);
-        board[x][y] = 0;
-        // 中心偏好
-        const center = size / 2;
-        score += Math.max(0, 5 - Math.abs(x - center) - Math.abs(y - center));
+
+        for (const [dx, dy] of directions) {
+            score += analyzeLine(x, y, dx, dy, player);
+        }
+
         return score;
     }
 
-    function aiMove() {
-        const moves = [];
+    // 评估整个棋盘
+    function evaluateBoard() {
+        let score = 0;
         for (let x = 0; x < size; x++) {
             for (let y = 0; y < size; y++) {
-                if (board[x][y] === 0) {
-                    // 只考虑周围有棋子的位置
-                    let hasNeighbor = false;
-                    for (let dx = -2; dx <= 2 && !hasNeighbor; dx++) {
-                        for (let dy = -2; dy <= 2 && !hasNeighbor; dy++) {
+                if (board[x][y] === 1) {
+                    score -= evaluatePosition(x, y, 1);
+                } else if (board[x][y] === 2) {
+                    score += evaluatePosition(x, y, 2);
+                }
+            }
+        }
+        return score;
+    }
+
+    // 生成候选着法（只考虑有意义的位置）
+    function generateMoves() {
+        const moves = [];
+        const checked = new Set();
+
+        // 如果是第一步，下在中心
+        let hasStone = false;
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                if (board[x][y] !== 0) {
+                    hasStone = true;
+                    break;
+                }
+            }
+            if (hasStone) break;
+        }
+
+        if (!hasStone) {
+            return [[Math.floor(size/2), Math.floor(size/2)]];
+        }
+
+        // 收集所有已有棋子周围2格内的空位
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                if (board[x][y] !== 0) {
+                    for (let dx = -2; dx <= 2; dx++) {
+                        for (let dy = -2; dy <= 2; dy++) {
                             const nx = x + dx, ny = y + dy;
-                            if (nx >= 0 && nx < size && ny >= 0 && ny < size && board[nx][ny] !== 0) hasNeighbor = true;
+                            if (nx >= 0 && nx < size && ny >= 0 && ny < size && board[nx][ny] === 0) {
+                                const key = `${nx},${ny}`;
+                                if (!checked.has(key)) {
+                                    checked.add(key);
+                                    moves.push([nx, ny]);
+                                }
+                            }
                         }
-                    }
-                    if (hasNeighbor || moves.length === 0) {
-                        moves.push([x, y, evaluateMove(x, y)]);
                     }
                 }
             }
         }
+
+        return moves;
+    }
+
+    // Minimax搜索（带Alpha-Beta剪枝）
+    function minimax(depth, alpha, beta, isMaximizing) {
+        // 检查游戏是否结束
+        const score = evaluateBoard();
+        if (Math.abs(score) > 50000) return score;
+        if (depth === 0) return score;
+
+        const moves = generateMoves();
+        if (moves.length === 0) return 0;
+
+        // 对候选着法进行排序（启发式搜索）
+        const scoredMoves = moves.map(([x, y]) => {
+            board[x][y] = isMaximizing ? 2 : 1;
+            const s = evaluatePosition(x, y, isMaximizing ? 2 : 1);
+            board[x][y] = 0;
+            return [x, y, s];
+        });
+        scoredMoves.sort((a, b) => b[2] - a[2]);
+
+        // 只考虑前15个最好的着法
+        const topMoves = scoredMoves.slice(0, 15);
+
+        if (isMaximizing) {
+            let maxEval = -Infinity;
+            for (const [x, y] of topMoves) {
+                board[x][y] = 2;
+                const eval_ = minimax(depth - 1, alpha, beta, false);
+                board[x][y] = 0;
+                maxEval = Math.max(maxEval, eval_);
+                alpha = Math.max(alpha, eval_);
+                if (beta <= alpha) break; // Beta剪枝
+            }
+            return maxEval;
+        } else {
+            let minEval = Infinity;
+            for (const [x, y] of topMoves) {
+                board[x][y] = 1;
+                const eval_ = minimax(depth - 1, alpha, beta, true);
+                board[x][y] = 0;
+                minEval = Math.min(minEval, eval_);
+                beta = Math.min(beta, eval_);
+                if (beta <= alpha) break; // Alpha剪枝
+            }
+            return minEval;
+        }
+    }
+
+    // AI选择最佳着法
+    function aiMove() {
+        const moves = generateMoves();
         if (moves.length === 0) return [Math.floor(size/2), Math.floor(size/2)];
-        moves.sort((a, b) => b[2] - a[2]);
-        return [moves[0][0], moves[0][1]];
+
+        // 首先检查是否有必胜或必防的着法
+        for (const [x, y] of moves) {
+            // 检查AI是否能直接获胜
+            board[x][y] = 2;
+            if (checkWin(x, y)) {
+                board[x][y] = 0;
+                return [x, y];
+            }
+            board[x][y] = 0;
+
+            // 检查是否需要防守对手的获胜着法
+            board[x][y] = 1;
+            if (checkWin(x, y)) {
+                board[x][y] = 0;
+                return [x, y];
+            }
+            board[x][y] = 0;
+        }
+
+        // 使用Minimax搜索找最佳着法
+        let bestMove = null;
+        let bestScore = -Infinity;
+        const depth = 4; // 搜索深度
+
+        // 评估每个候选着法
+        const scoredMoves = moves.map(([x, y]) => {
+            board[x][y] = 2;
+            const attackScore = evaluatePosition(x, y, 2);
+            board[x][y] = 1;
+            const defenseScore = evaluatePosition(x, y, 1);
+            board[x][y] = 0;
+            return [x, y, attackScore + defenseScore];
+        });
+        scoredMoves.sort((a, b) => b[2] - a[2]);
+
+        // 只对前10个最有希望的着法进行深度搜索
+        const topMoves = scoredMoves.slice(0, 10);
+
+        for (const [x, y] of topMoves) {
+            board[x][y] = 2;
+            const score = minimax(depth - 1, -Infinity, Infinity, false);
+            board[x][y] = 0;
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestMove = [x, y];
+            }
+        }
+
+        return bestMove || moves[0];
     }
 
     function doAiMove() {

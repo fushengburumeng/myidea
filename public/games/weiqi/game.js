@@ -13,12 +13,14 @@
     let currentPlayer = 0;
     let board = [];
     let captures = [0, 0];
+    let moveHistory = []; // 记录历史着法
     const size = 19;
     const cellSize = 28;
     const padding = 20;
 
     // 设置
     let aiDifficulty = 'medium';
+    let useServerAi = true; // 优先使用服务端AI
     let showQi = false;
     let showShi = false;
 
@@ -82,6 +84,7 @@
 
     function initBoard() {
         board = Array(size).fill(null).map(() => Array(size).fill(0));
+        moveHistory = [];
     }
 
     // ========== AI逻辑 ==========
@@ -137,6 +140,8 @@
 
     function placeStone(x, y, player) {
         board[x][y] = player;
+        // 记录历史着法
+        moveHistory.push({ x, y, color: player });
         const opponent = player === 1 ? 2 : 1;
         let captured = 0;
         for (const [nx, ny] of getNeighbors(x, y)) {
@@ -245,23 +250,83 @@
     }
 
     function doAiMove() {
-        setTimeout(() => {
-            const move = aiMove();
-            if (move) {
-                placeStone(move[0], move[1], 2);
-                currentPlayer = 0;
-            } else {
-                addChatMessage('AI', '停一手');
-                currentPlayer = 0;
-            }
-            updateStatus();
-            draw();
-        }, 500);
+        // 优先使用服务端AI
+        if (useServerAi && aiWs && aiWs.readyState === 1) {
+            updateStatus('AI思考中...');
+            aiWs.send(JSON.stringify({
+                type: 'aiRequest',
+                game: 'weiqi',
+                moves: moveHistory,
+                boardSize: size
+            }));
+        } else {
+            // 回退到本地AI
+            setTimeout(() => {
+                const move = aiMove();
+                if (move) {
+                    placeStone(move[0], move[1], 2);
+                    currentPlayer = 0;
+                } else {
+                    addChatMessage('AI', '停一手');
+                    currentPlayer = 0;
+                }
+                updateStatus();
+                draw();
+            }, 500);
+        }
+    }
+
+    // 处理服务端AI响应
+    function handleAiResponse(msg) {
+        if (msg.move === 'pass') {
+            addChatMessage('AI', '停一手');
+        } else {
+            placeStone(msg.x, msg.y, 2);
+        }
+        currentPlayer = 0;
+        updateStatus();
+        draw();
     }
     // ========== AI逻辑结束 ==========
 
+    // AI模式下用于服务端AI的WebSocket
+    let aiWs = null;
+
+    function connectAiWs() {
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        aiWs = new WebSocket(`${protocol}//${location.host}`);
+
+        aiWs.onopen = () => {
+            console.log('[AI WebSocket] 已连接');
+        };
+
+        aiWs.onmessage = (e) => {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'aiResponse' && msg.game === 'weiqi') {
+                handleAiResponse(msg);
+            } else if (msg.type === 'aiError') {
+                addChatMessage('系统', 'AI引擎错误: ' + msg.message + '，使用本地AI');
+                useServerAi = false;
+                doAiMove();
+            }
+        };
+
+        aiWs.onclose = () => {
+            console.log('[AI WebSocket] 断开，5秒后重连');
+            setTimeout(connectAiWs, 5000);
+        };
+
+        aiWs.onerror = () => {
+            console.log('[AI WebSocket] 连接失败');
+        };
+    }
+
     function connect() {
-        if (isAiMode) return;
+        if (isAiMode) {
+            // AI模式下连接WebSocket以使用服务端AI
+            connectAiWs();
+            return;
+        }
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(`${protocol}//${location.host}`);
 

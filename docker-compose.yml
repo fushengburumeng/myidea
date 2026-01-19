@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  game-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: weiqi-game-server
+    ports:
+      - "9527:9527"
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=9527
+    volumes:
+      # 可选：挂载日志目录
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:9527', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 512M
+    networks:
+      - game-network
+
+networks:
+  game-network:
+    driver: bridge

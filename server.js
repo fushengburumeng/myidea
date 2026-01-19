@@ -3,6 +3,15 @@ const { WebSocketServer } = require('ws');
 const http = require('http');
 const path = require('path');
 
+// AI引擎管理器
+let engineManager = null;
+try {
+    engineManager = require('./ai/engine-manager');
+    console.log('[Server] AI引擎管理器已加载');
+} catch (err) {
+    console.log('[Server] AI引擎管理器未加载:', err.message);
+}
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -106,6 +115,17 @@ function handleMessage(ws, msg) {
 
         case 'chat':
             handleChat(ws, msg.text);
+            break;
+
+        case 'aiRequest':
+            handleAiRequest(ws, msg);
+            break;
+
+        case 'getAiStatus':
+            sendTo(ws, {
+                type: 'aiStatus',
+                status: engineManager ? engineManager.getStatus() : null
+            });
             break;
     }
 }
@@ -588,7 +608,73 @@ function handleDisconnect(ws) {
     leaveRoom(ws);
 }
 
+// 处理AI请求
+async function handleAiRequest(ws, msg) {
+    if (!engineManager) {
+        sendTo(ws, { type: 'aiError', message: 'AI引擎未配置' });
+        return;
+    }
+
+    try {
+        if (msg.game === 'chess') {
+            // 中国象棋AI
+            const move = await engineManager.getChessMove(msg.fen, msg.depth || 10);
+            sendTo(ws, {
+                type: 'aiResponse',
+                game: 'chess',
+                move: move
+            });
+        } else if (msg.game === 'weiqi') {
+            // 围棋AI
+            const result = await engineManager.getWeiqiMove({
+                boardSize: msg.boardSize,
+                moves: msg.moves
+            });
+
+            if (result.pass) {
+                sendTo(ws, { type: 'aiResponse', game: 'weiqi', move: 'pass' });
+            } else {
+                sendTo(ws, {
+                    type: 'aiResponse',
+                    game: 'weiqi',
+                    x: result.x,
+                    y: result.y
+                });
+            }
+        } else {
+            sendTo(ws, { type: 'aiError', message: '不支持的游戏类型' });
+        }
+    } catch (err) {
+        console.error('[AI Error]', err);
+        sendTo(ws, { type: 'aiError', message: err.message || '引擎错误' });
+    }
+}
+
 const PORT = process.env.PORT || 9527;
 server.listen(PORT, () => {
     console.log(`游戏服务器运行在 http://localhost:${PORT}`);
+    if (engineManager) {
+        const status = engineManager.getStatus();
+        console.log(`AI引擎状态: KataGo可用=${status.katago.available}, Pikafish可用=${status.pikafish.available}`);
+    }
 });
+
+// 优雅关闭
+function gracefulShutdown(signal) {
+    console.log(`收到 ${signal} 信号，正在关闭服务器...`);
+    if (engineManager) {
+        engineManager.shutdown();
+    }
+    server.close(() => {
+        console.log('服务器已关闭');
+        process.exit(0);
+    });
+    // 强制退出超时
+    setTimeout(() => {
+        console.log('强制退出');
+        process.exit(1);
+    }, 5000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

@@ -8,11 +8,13 @@
 
     const isAiMode = roomData.mode === 'ai';
     let ws = null;
+    let useServerAi = true; // 优先使用服务端AI
     let mySeat = isAiMode ? 0 : roomData.seat;
     let gameStarted = isAiMode;
     let currentPlayer = 0;
     let board = [];
     let selectedPiece = null;
+    let aiThinking = false; // AI思考中标志
 
     const cellWidth = 50;
     const cellHeight = 50;
@@ -207,6 +209,43 @@
         return moves;
     }
 
+    // ========== FEN转换函数 ==========
+    /**
+     * 将棋盘转换为FEN格式
+     * FEN格式：rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1
+     */
+    function boardToFen() {
+        const pieceMap = {
+            1: 'R', 2: 'N', 3: 'B', 4: 'A', 5: 'K', 6: 'C', 7: 'P',
+            '-1': 'r', '-2': 'n', '-3': 'b', '-4': 'a', '-5': 'k', '-6': 'c', '-7': 'p'
+        };
+
+        let fen = '';
+        for (let y = 0; y < rows; y++) {
+            let empty = 0;
+            for (let x = 0; x < cols; x++) {
+                const piece = board[y][x];
+                if (piece === 0) {
+                    empty++;
+                } else {
+                    if (empty > 0) {
+                        fen += empty;
+                        empty = 0;
+                    }
+                    fen += pieceMap[piece];
+                }
+            }
+            if (empty > 0) fen += empty;
+            if (y < rows - 1) fen += '/';
+        }
+
+        // 添加当前玩家 (w=红方, b=黑方)
+        fen += currentPlayer === 0 ? ' w' : ' b';
+        fen += ' - - 0 1';
+
+        return fen;
+    }
+
     // ========== AI逻辑 ==========
     function evaluateBoard() {
         let score = 0;
@@ -302,30 +341,53 @@
     }
 
     function doAiMove() {
-        setTimeout(() => {
-            const move = aiMove();
-            if (move) {
-                const piece = board[move.fromY][move.fromX];
-                const captured = board[move.toY][move.toX];
-                board[move.toY][move.toX] = piece;
-                board[move.fromY][move.fromX] = 0;
-                currentPlayer = 0;
-                selectedPiece = null;
-                draw();
-                updateStatus();
+        if (aiThinking) return;
 
-                // 检查是否吃掉了帅
-                if (captured === 5) {
-                    addChatMessage('系统', '游戏结束！黑方获胜');
-                    showGameEndEffect(false, '你输了');
+        // 优先使用服务端AI
+        if (useServerAi && ws) {
+            aiThinking = true;
+            updateStatus();
+            addChatMessage('系统', 'AI思考中...');
+
+            const fen = boardToFen();
+            ws.send(JSON.stringify({
+                type: 'aiRequest',
+                game: 'chess',
+                fen: fen,
+                depth: 10
+            }));
+        } else {
+            // 回退到本地AI
+            setTimeout(() => {
+                const move = aiMove();
+                if (move) {
+                    executeAiMove(move);
+                } else {
+                    addChatMessage('系统', '游戏结束！红方获胜');
+                    showGameEndEffect(true, '你赢了！');
                     gameStarted = false;
                 }
-            } else {
-                addChatMessage('系统', '游戏结束！红方获胜');
-                showGameEndEffect(true, '你赢了！');
-                gameStarted = false;
-            }
-        }, 500);
+            }, 500);
+        }
+    }
+
+    function executeAiMove(move) {
+        const piece = board[move.fromY][move.fromX];
+        const captured = board[move.toY][move.toX];
+        board[move.toY][move.toX] = piece;
+        board[move.fromY][move.fromX] = 0;
+        currentPlayer = 0;
+        selectedPiece = null;
+        aiThinking = false;
+        draw();
+        updateStatus();
+
+        // 检查是否吃掉了帅
+        if (captured === 5) {
+            addChatMessage('系统', '游戏结束！黑方获胜');
+            showGameEndEffect(false, '你输了');
+            gameStarted = false;
+        }
     }
 
     function makeMove(fromX, fromY, toX, toY) {
@@ -366,13 +428,14 @@
     // ========== AI逻辑结束 ==========
 
     function connect() {
-        if (isAiMode) return;
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(`${protocol}//${location.host}`);
 
         ws.onopen = () => {
             ws.send(JSON.stringify({ type: 'setName', name: localStorage.getItem('playerName') || '玩家' }));
-            ws.send(JSON.stringify({ type: 'joinRoom', roomId: roomData.roomId }));
+            if (!isAiMode) {
+                ws.send(JSON.stringify({ type: 'joinRoom', roomId: roomData.roomId }));
+            }
         };
 
         ws.onmessage = (e) => {
@@ -381,8 +444,20 @@
         };
 
         ws.onclose = () => {
-            addChatMessage('系统', '连接断开，正在重连...');
-            setTimeout(connect, 3000);
+            if (!isAiMode) {
+                addChatMessage('系统', '连接断开，正在重连...');
+                setTimeout(connect, 3000);
+            } else {
+                addChatMessage('系统', '与服务器断开连接，使用本地AI');
+                useServerAi = false;
+            }
+        };
+
+        ws.onerror = () => {
+            if (isAiMode) {
+                addChatMessage('系统', '服务器AI不可用，使用本地AI');
+                useServerAi = false;
+            }
         };
     }
 
@@ -449,12 +524,32 @@
             case 'leftRoom':
                 window.location.href = '/';
                 break;
+            case 'aiResponse':
+                if (msg.game === 'chess' && msg.move) {
+                    aiThinking = false;
+                    executeAiMove(msg.move);
+                }
+                break;
+            case 'aiError':
+                aiThinking = false;
+                addChatMessage('系统', `AI错误: ${msg.message}，使用本地AI`);
+                useServerAi = false;
+                // 使用本地AI重试
+                setTimeout(() => {
+                    const move = aiMove();
+                    if (move) {
+                        executeAiMove(move);
+                    }
+                }, 500);
+                break;
             case 'error':
                 alert(msg.message);
-                // 收到错误后返回大厅，避免重连循环
-                ws.onclose = null;
-                ws.close();
-                window.location.href = '/';
+                if (!isAiMode) {
+                    // 收到错误后返回大厅，避免重连循环
+                    ws.onclose = null;
+                    ws.close();
+                    window.location.href = '/';
+                }
                 break;
         }
     }
@@ -479,7 +574,13 @@
             currentPlayerEl.textContent = '等待开始';
         } else {
             const isMyTurn = mySeat === currentPlayer;
-            currentPlayerEl.textContent = (currentPlayer === 0 ? '红方' : '黑方') + (isMyTurn ? ' (你的回合)' : '');
+            let statusText = (currentPlayer === 0 ? '红方' : '黑方');
+            if (aiThinking) {
+                statusText += ' (AI思考中...)';
+            } else if (isMyTurn) {
+                statusText += ' (你的回合)';
+            }
+            currentPlayerEl.textContent = statusText;
         }
     }
 
