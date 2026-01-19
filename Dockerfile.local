@@ -12,16 +12,29 @@ RUN apk add --no-cache libstdc++ libgomp
 COPY package*.json ./
 RUN npm install --production
 
-# 复制应用代码
+# 复制应用代码（先复制，ai/bin 会被后面的 COPY 覆盖）
 COPY . .
 
-# 复制本地已下载的AI引擎（需要先运行 download-engines.sh）
-COPY ai/bin /app/ai/bin
+# 显式复制 AI 引擎文件（确保复制成功）
+COPY ai/bin/katago /app/ai/bin/katago
+COPY ai/bin/pikafish /app/ai/bin/pikafish
+
+# 设置执行权限
+RUN chmod +x /app/ai/bin/katago/katago 2>/dev/null || echo "KataGo 不存在" && \
+    chmod +x /app/ai/bin/pikafish/pikafish 2>/dev/null || echo "Pikafish 不存在"
 
 # 验证引擎文件
-RUN echo "验证引擎文件..." && \
-    ls -lh /app/ai/bin/katago/ || echo "警告: KataGo 未找到" && \
-    ls -lh /app/ai/bin/pikafish/ || echo "警告: Pikafish 未找到"
+RUN echo "========== AI 引擎文件验证 ==========" && \
+    echo "KataGo 目录:" && \
+    ls -lh /app/ai/bin/katago/ && \
+    echo "" && \
+    echo "Pikafish 目录:" && \
+    ls -lh /app/ai/bin/pikafish/ && \
+    echo "" && \
+    echo "检查可执行文件:" && \
+    test -x /app/ai/bin/katago/katago && echo "✓ KataGo 可执行" || echo "✗ KataGo 不可执行" && \
+    test -x /app/ai/bin/pikafish/pikafish && echo "✓ Pikafish 可执行" || echo "✗ Pikafish 不可执行" && \
+    echo "====================================="
 
 # 暴露端口
 EXPOSE 9527
