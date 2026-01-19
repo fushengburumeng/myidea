@@ -1,0 +1,104 @@
+# 备用方案：使用国内镜像加速
+# 如果GitHub下载失败，可以使用这个Dockerfile
+
+FROM alpine:3.19 AS downloader
+
+WORKDIR /tmp
+
+# 使用阿里云镜像源加速
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
+    apk add --no-cache wget unzip curl
+
+# 方案1：从GitHub下载（带重试）
+# 方案2：如果GitHub失败，使用预下载的文件
+
+# 创建引擎目录
+RUN mkdir -p /engines/katago /engines/pikafish
+
+# 下载 KataGo
+RUN cd /engines/katago && \
+    echo "正在下载 KataGo..." && \
+    (wget --timeout=60 --tries=3 --retry-connrefused \
+        https://github.com/lightvector/KataGo/releases/download/v1.14.1/katago-v1.14.1-linux-x64.zip \
+        -O katago.zip || \
+     wget --timeout=60 --tries=3 \
+        https://ghproxy.com/https://github.com/lightvector/KataGo/releases/download/v1.14.1/katago-v1.14.1-linux-x64.zip \
+        -O katago.zip) && \
+    unzip -q katago.zip && \
+    rm katago.zip && \
+    chmod +x katago && \
+    echo "KataGo 下载完成"
+
+# 下载 KataGo 模型
+RUN cd /engines/katago && \
+    echo "正在下载 KataGo 模型..." && \
+    (wget --timeout=60 --tries=3 --retry-connrefused \
+        https://github.com/lightvector/KataGo/releases/download/v1.4.5/g170e-b6c96-s175395328-d26788732.bin.gz \
+        -O b6.bin.gz || \
+     wget --timeout=60 --tries=3 \
+        https://ghproxy.com/https://github.com/lightvector/KataGo/releases/download/v1.4.5/g170e-b6c96-s175395328-d26788732.bin.gz \
+        -O b6.bin.gz) && \
+    echo "模型下载完成"
+
+# 创建配置文件
+RUN cd /engines/katago && \
+    cat > config.cfg << 'EOF'
+logSearchInfo = false
+logToStderr = false
+maxVisits = 100
+numSearchThreads = 1
+EOF
+
+# 下载 Pikafish
+RUN cd /engines/pikafish && \
+    echo "正在下载 Pikafish..." && \
+    (wget --timeout=60 --tries=3 --retry-connrefused \
+        https://github.com/official-pikafish/Pikafish/releases/latest/download/pikafish-bmi2 \
+        -O pikafish || \
+     wget --timeout=60 --tries=3 \
+        https://ghproxy.com/https://github.com/official-pikafish/Pikafish/releases/latest/download/pikafish-bmi2 \
+        -O pikafish) && \
+    chmod +x pikafish && \
+    echo "Pikafish 下载完成"
+
+# 验证文件
+RUN ls -lh /engines/katago/ && \
+    ls -lh /engines/pikafish/ && \
+    test -f /engines/katago/katago && \
+    test -f /engines/katago/b6.bin.gz && \
+    test -f /engines/pikafish/pikafish
+
+# 应用构建阶段
+FROM node:18-alpine
+
+WORKDIR /app
+
+# 使用阿里云npm镜像
+RUN npm config set registry https://registry.npmmirror.com
+
+# 安装运行时依赖
+RUN apk add --no-cache libstdc++ libgomp
+
+# 复制依赖文件
+COPY package*.json ./
+RUN npm install --production
+
+# 复制应用代码
+COPY . .
+
+# 从下载阶段复制引擎
+COPY --from=downloader /engines /app/ai/bin
+
+# 验证引擎
+RUN ls -lh /app/ai/bin/katago/ && \
+    ls -lh /app/ai/bin/pikafish/ && \
+    test -x /app/ai/bin/katago/katago && \
+    test -f /app/ai/bin/katago/b6.bin.gz && \
+    test -x /app/ai/bin/pikafish/pikafish
+
+EXPOSE 9527
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:9527', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+CMD ["node", "server.js"]

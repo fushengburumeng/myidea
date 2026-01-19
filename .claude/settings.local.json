@@ -11,7 +11,10 @@
       "Bash(ssh:*)",
       "Bash(tree:*)",
       "Bash(find:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(ls:*)"
     ]
   }
 }

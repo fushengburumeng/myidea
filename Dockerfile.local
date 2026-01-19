@@ -1,0 +1,34 @@
+# 本地构建方案：先下载引擎，再构建镜像
+# 适用于网络不稳定的情况
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# 安装运行时依赖
+RUN apk add --no-cache libstdc++ libgomp
+
+# 复制 package.json 并安装依赖
+COPY package*.json ./
+RUN npm install --production
+
+# 复制应用代码
+COPY . .
+
+# 复制本地已下载的AI引擎（需要先运行 download-engines.sh）
+COPY ai/bin /app/ai/bin
+
+# 验证引擎文件
+RUN echo "验证引擎文件..." && \
+    ls -lh /app/ai/bin/katago/ || echo "警告: KataGo 未找到" && \
+    ls -lh /app/ai/bin/pikafish/ || echo "警告: Pikafish 未找到"
+
+# 暴露端口
+EXPOSE 9527
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:9527', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# 启动应用
+CMD ["node", "server.js"]
