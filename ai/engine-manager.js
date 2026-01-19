@@ -165,10 +165,20 @@ class EngineManager {
             console.log(`[EngineManager] Pikafish响应: ${uciMove}, 耗时${elapsed}ms`);
 
             // 解析UCI着法
+            // UCI坐标系：行号从下往上（0=红方底线，9=黑方底线）
+            // 前端坐标系：行号从上往下（0=黑方底线，9=红方底线）
+            // 转换公式：前端Y = 9 - UCI_Y
             const fromX = uciMove.charCodeAt(0) - 'a'.charCodeAt(0);
-            const fromY = parseInt(uciMove[1]);
+            const fromY_uci = parseInt(uciMove[1]);
             const toX = uciMove.charCodeAt(2) - 'a'.charCodeAt(0);
-            const toY = parseInt(uciMove[3]);
+            const toY_uci = parseInt(uciMove[3]);
+
+            // 转换Y坐标
+            const fromY = 9 - fromY_uci;
+            const toY = 9 - toY_uci;
+
+            console.log(`[EngineManager] UCI坐标: ${uciMove} -> UCI(${fromX},${fromY_uci}) to (${toX},${toY_uci})`);
+            console.log(`[EngineManager] 前端坐标: board[${fromY}][${fromX}] to board[${toY}][${toX}]`);
 
             resolve({
                 fromX, fromY,
