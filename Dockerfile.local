@@ -1,47 +1,53 @@
-# 本地构建方案：先下载引擎，再构建镜像
-# 适用于网络不稳定的情况
-
-FROM node:18-alpine
+# 使用 Debian Bookworm 镜像，解决 glibc 兼容性问题
+FROM node:18-bookworm-slim
 
 WORKDIR /app
 
-# 安装运行时依赖
-RUN apk add --no-cache libstdc++ libgomp
+# 1. 安装 Debian 环境下的运行时依赖 (必须使用 apt)
+# libatomic1: 解决你之前遇到的 libatomic.so.1 缺失问题
+# libgomp1: 解决 OpenMP 运行库缺失问题
+# libzip4: KataGo 加载模型权重所需
+RUN apt-get update && apt-get install -y \
+    libatomic1 \
+    libgomp1 \
+    libzip4 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# 复制 package.json 并安装依赖
+# 2. 复制依赖描述文件并安装 (利用缓存)
 COPY package*.json ./
 RUN npm install --production
 
-# 复制应用代码（先复制，ai/bin 会被后面的 COPY 覆盖）
+# 3. 复制应用代码
 COPY . .
 
-# 显式复制 AI 引擎文件（确保复制成功）
+# 4. 显式复制 AI 引擎文件（确保宿主机对应目录有文件）
 COPY ai/bin/katago /app/ai/bin/katago
 COPY ai/bin/pikafish /app/ai/bin/pikafish
 
-# 设置执行权限
-RUN chmod +x /app/ai/bin/katago/katago 2>/dev/null || echo "KataGo 不存在" && \
-    chmod +x /app/ai/bin/pikafish/pikafish 2>/dev/null || echo "Pikafish 不存在"
+# 5. 设置执行权限
+# 移除 2>/dev/null 方便我们在构建日志中直接看到报错
+RUN chmod +x /app/ai/bin/katago/katago && \
+    chmod +x /app/ai/bin/pikafish/pikafish
 
-# 验证引擎文件
-RUN echo "========== AI 引擎文件验证 ==========" && \
-    echo "KataGo 目录:" && \
-    ls -lh /app/ai/bin/katago/ && \
+# 6. 验证引擎文件及依赖环境
+RUN echo "========== AI 引擎及依赖验证 ==========" && \
+    echo "1. 检查文件权限:" && \
+    ls -lh /app/ai/bin/katago/katago && \
+    ls -lh /app/ai/bin/pikafish/pikafish && \
     echo "" && \
-    echo "Pikafish 目录:" && \
-    ls -lh /app/ai/bin/pikafish/ && \
-    echo "" && \
-    echo "检查可执行文件:" && \
-    test -x /app/ai/bin/katago/katago && echo "✓ KataGo 可执行" || echo "✗ KataGo 不可执行" && \
-    test -x /app/ai/bin/pikafish/pikafish && echo "✓ Pikafish 可执行" || echo "✗ Pikafish 不可执行" && \
+    echo "2. 验证动态链接库 (关键步骤):" && \
+    ldd /app/ai/bin/katago/katago && \
+    echo "-----------------------------------" && \
+    ldd /app/ai/bin/pikafish/pikafish && \
     echo "====================================="
 
 # 暴露端口
 EXPOSE 9527
 
-# 健康检查
+# 健康检查 (适应 Debian 环境)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:9527', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+    CMD node -e "require('http').get('http://localhost:9527/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
 
 # 启动应用
 CMD ["node", "server.js"]
