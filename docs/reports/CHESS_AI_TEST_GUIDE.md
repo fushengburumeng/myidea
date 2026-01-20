@@ -6,7 +6,7 @@
 ```bash
 npm start
 # 或使用Docker
-./deploy.sh
+./scripts/deployment/deploy.sh
 ```
 
 ### 2. 访问游戏

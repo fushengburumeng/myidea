@@ -28,7 +28,7 @@ cd myidea/weiqi
 
 # 2. 运行部署脚本
 chmod +x deploy.sh
-./deploy.sh
+./scripts/deployment/deploy.sh
 ```
 
 部署脚本会自动：

@@ -207,7 +207,7 @@ fb3d08b docs: 添加中国象棋AI阵营逻辑修复报告
    ```bash
    npm start
    # 或使用Docker
-   ./deploy.sh
+   ./scripts/deployment/deploy.sh
    ```
 
 2. **开始AI对弈**

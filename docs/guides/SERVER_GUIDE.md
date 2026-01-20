@@ -69,13 +69,13 @@ echo "uci" | ./ai/bin/pikafish/pikafish
 
 ```bash
 # 停止旧容器
-docker-compose -f docker-compose.local.yml down
+docker-compose -f docker/docker-compose.local.yml down
 
 # 重新构建（不使用缓存）
-docker-compose -f docker-compose.local.yml build --no-cache
+docker-compose -f docker/docker-compose.local.yml build --no-cache
 
 # 启动
-docker-compose -f docker-compose.local.yml up -d
+docker-compose -f docker/docker-compose.local.yml up -d
 ```
 
 ### 步骤5：查看日志
@@ -168,7 +168,7 @@ cd myidea/weiqi
 
 # 方式2：手动更新
 git pull origin master
-docker-compose -f docker-compose.local.yml up -d --build
+docker-compose -f docker/docker-compose.local.yml up -d --build
 ```
 
 ---

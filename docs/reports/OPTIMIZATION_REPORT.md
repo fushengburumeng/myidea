@@ -143,7 +143,7 @@ chmod +x verify-deployment.sh
 
 # 步骤3：正式部署
 chmod +x deploy.sh
-./deploy.sh
+./scripts/deployment/deploy.sh
 
 # 步骤4：访问游戏
 # 浏览器打开: http://localhost:9527
@@ -153,7 +153,7 @@ chmod +x deploy.sh
 
 ```bash
 # 直接部署（AI功能将不可用）
-./deploy.sh
+./scripts/deployment/deploy.sh
 
 # 访问游戏（只能玩联机对战）
 # http://localhost:9527
@@ -186,7 +186,7 @@ chmod +x deploy.sh
 ./verify-deployment.sh
 
 # 部署服务
-./deploy.sh
+./scripts/deployment/deploy.sh
 
 # 推送代码
 git push origin master

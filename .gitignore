@@ -1,4 +1,40 @@
+# Dependencies
 node_modules/
-.DS_Store
+package-lock.json
+
+# AI Engine Binaries (must be downloaded separately)
+ai/bin/katago/katago
+ai/bin/katago/katago.exe
+ai/bin/katago/*.bin.gz
+ai/bin/pikafish/pikafish
+ai/bin/pikafish/pikafish.exe
+
+# Logs
+logs/
 *.log
+npm-debug.log*
+ai/gtp_logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+
+# Environment
 .env
+.env.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp

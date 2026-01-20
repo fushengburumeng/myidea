@@ -63,9 +63,9 @@ ls -lh ai/bin/pikafish/pikafish
 echo "uci" | ./ai/bin/pikafish/pikafish
 
 # 步骤5: 重新构建 Docker
-docker-compose -f docker-compose.local.yml down
-docker-compose -f docker-compose.local.yml build --no-cache
-docker-compose -f docker-compose.local.yml up -d
+docker-compose -f docker/docker-compose.local.yml down
+docker-compose -f docker/docker-compose.local.yml build --no-cache
+docker-compose -f docker/docker-compose.local.yml up -d
 
 # 步骤6: 查看日志
 docker logs -f weiqi-game-server
@@ -185,7 +185,7 @@ cd myidea/weiqi
 
 # 方式2: 手动更新
 git pull origin master
-docker-compose -f docker-compose.local.yml up -d --build
+docker-compose -f docker/docker-compose.local.yml up -d --build
 ```
 
 ---

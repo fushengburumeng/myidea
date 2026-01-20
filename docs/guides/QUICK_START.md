@@ -16,8 +16,8 @@ git clone https://github.com/fushengburumeng/myidea.git
 cd myidea/weiqi
 
 # 运行下载脚本
-chmod +x download-engines.sh
-./download-engines.sh
+chmod +x scripts/deployment/download-engines.sh
+./scripts/deployment/download-engines.sh
 ```
 
 **脚本会自动：**
@@ -73,7 +73,7 @@ docker build -f Dockerfile.local -t weiqi-game-platform .
 **方式A：使用Docker Compose（推荐）**
 
 ```bash
-docker-compose -f docker-compose.local.yml up -d
+docker-compose -f docker/docker-compose.local.yml up -d
 ```
 
 **方式B：使用docker run**
@@ -216,19 +216,19 @@ docker stats weiqi-game-server
 
 ```bash
 # 启动
-docker-compose -f docker-compose.local.yml up -d
+docker-compose -f docker/docker-compose.local.yml up -d
 
 # 停止
-docker-compose -f docker-compose.local.yml down
+docker-compose -f docker/docker-compose.local.yml down
 
 # 重启
-docker-compose -f docker-compose.local.yml restart
+docker-compose -f docker/docker-compose.local.yml restart
 
 # 查看日志
-docker-compose -f docker-compose.local.yml logs -f
+docker-compose -f docker/docker-compose.local.yml logs -f
 
 # 重新构建
-docker-compose -f docker-compose.local.yml up -d --build
+docker-compose -f docker/docker-compose.local.yml up -d --build
 ```
 
 ---
@@ -300,8 +300,8 @@ docker exec weiqi-game-server /app/ai/bin/katago/katago version
 docker exec weiqi-game-server /app/ai/bin/pikafish/pikafish --version
 
 # 重新构建
-docker-compose -f docker-compose.local.yml down
-docker-compose -f docker-compose.local.yml up -d --build
+docker-compose -f docker/docker-compose.local.yml down
+docker-compose -f docker/docker-compose.local.yml up -d --build
 ```
 
 ---
@@ -371,11 +371,11 @@ cd myidea/weiqi
 git pull origin master
 
 # 重新下载引擎（如果有更新）
-./download-engines.sh
+./scripts/deployment/download-engines.sh
 
 # 重新构建并启动
-docker-compose -f docker-compose.local.yml down
-docker-compose -f docker-compose.local.yml up -d --build
+docker-compose -f docker/docker-compose.local.yml down
+docker-compose -f docker/docker-compose.local.yml up -d --build
 ```
 
 ---
@@ -388,7 +388,7 @@ docker-compose -f docker-compose.local.yml up -d --build
 | `Dockerfile.local` | 本地构建（使用本地引擎）**推荐** |
 | `Dockerfile.mirror` | 镜像加速构建 |
 | `docker-compose.yml` | 在线构建配置 |
-| `docker-compose.local.yml` | 本地构建配置 **推荐** |
+| `docker/docker-compose.local.yml` | 本地构建配置 **推荐** |
 | `download-engines.sh` | 引擎下载脚本 |
 
 ---

@@ -11,7 +11,7 @@ cd myidea/weiqi
 
 # 2. 运行部署脚本
 chmod +x deploy.sh
-./deploy.sh
+./scripts/deployment/deploy.sh
 ```
 
 等待5-10分钟，部署完成后访问：`http://your-server-ip:9527`
@@ -53,7 +53,7 @@ chmod +x deploy.sh
 git clone https://github.com/fushengburumeng/myidea.git
 cd myidea/weiqi
 chmod +x deploy.sh
-./deploy.sh
+./scripts/deployment/deploy.sh
 ```
 
 **脚本功能：**
@@ -294,7 +294,7 @@ cd myidea/weiqi
 git pull origin master
 
 # 重新部署
-./deploy.sh
+./scripts/deployment/deploy.sh
 
 # 或使用 Docker Compose
 docker-compose down

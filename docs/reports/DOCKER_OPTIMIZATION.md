@@ -108,7 +108,7 @@ chmod +x pikafish
 chmod +x deploy.sh
 
 # 执行部署（会自动检查AI引擎文件）
-./deploy.sh
+./scripts/deployment/deploy.sh
 ```
 
 ### 步骤3：验证部署
@@ -156,7 +156,7 @@ ls -lh /app/ai/bin/pikafish/
 
 2. **测试部署**：
    ```bash
-   ./deploy.sh
+   ./scripts/deployment/deploy.sh
    ```
 
 3. **监控日志**：

@@ -82,7 +82,7 @@
 ./verify-deployment.sh
 
 # 3. 正式部署
-./deploy.sh
+./scripts/deployment/deploy.sh
 
 # 4. 访问游戏
 # http://localhost:9527
@@ -92,7 +92,7 @@
 
 ```bash
 # 直接部署（AI功能将不可用）
-./deploy.sh
+./scripts/deployment/deploy.sh
 
 # 访问游戏（只能玩联机对战）
 # http://localhost:9527
@@ -119,7 +119,7 @@
 ./verify-deployment.sh
 
 # 部署服务
-./deploy.sh
+./scripts/deployment/deploy.sh
 
 # 推送代码
 git push origin master

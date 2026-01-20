@@ -36,8 +36,8 @@ chmod +x fix-engines.sh
 ./fix-engines.sh
 
 # 4. 重新构建并启动
-docker-compose -f docker-compose.local.yml down
-docker-compose -f docker-compose.local.yml up -d --build
+docker-compose -f docker/docker-compose.local.yml down
+docker-compose -f docker/docker-compose.local.yml up -d --build
 
 # 5. 查看日志确认
 docker logs -f weiqi-game-server
@@ -107,8 +107,8 @@ ls -lh ai/bin/pikafish/pikafish
 echo "uci" | ./ai/bin/pikafish/pikafish
 
 # 4. 重新构建 Docker
-docker-compose -f docker-compose.local.yml down
-docker-compose -f docker-compose.local.yml up -d --build
+docker-compose -f docker/docker-compose.local.yml down
+docker-compose -f docker/docker-compose.local.yml up -d --build
 
 # 5. 查看日志（应该看到 "AI引擎状态: KataGo可用=true, Pikafish可用=true"）
 docker logs weiqi-game-server | grep -E "KataGo|Pikafish|AI引擎"
@@ -157,7 +157,7 @@ A:
 1. 检查文件是否真的存在：`ls -lh ai/bin/katago/ ai/bin/pikafish/`
 2. 检查权限：`ls -l ai/bin/katago/katago ai/bin/pikafish/pikafish`
 3. 尝试手动运行引擎看错误信息
-4. 如果还是不行，重新运行 `./download-engines.sh`
+4. 如果还是不行，重新运行 `./scripts/deployment/download-engines.sh`
 
 ### Q: Docker 容器里看到文件但无法执行？
 A: 可能是 Alpine Linux 缺少依赖库。检查 Dockerfile.local 是否包含：

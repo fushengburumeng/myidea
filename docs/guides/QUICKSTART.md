@@ -29,7 +29,7 @@ chmod +x verify-deployment.sh
 chmod +x deploy.sh
 
 # 部署到Docker
-./deploy.sh
+./scripts/deployment/deploy.sh
 ```
 
 ## 📋 详细说明
@@ -116,7 +116,7 @@ docker ps | grep weiqi
 git pull
 
 # 重新部署
-./deploy.sh
+./scripts/deployment/deploy.sh
 ```
 
 ## 🔧 故障排查
@@ -237,7 +237,7 @@ sudo ufw allow from your-ip to any port 9527
 ```bash
 # 定期拉取最新代码
 git pull
-./deploy.sh
+./scripts/deployment/deploy.sh
 ```
 
 ## 💡 提示

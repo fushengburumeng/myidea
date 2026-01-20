@@ -22,8 +22,8 @@ ERROR: failed to solve: process "/bin/sh -c ... wget ... github.com ..." did not
 
 ```bash
 # 1. 先在本地下载AI引擎
-chmod +x download-engines.sh
-./download-engines.sh
+chmod +x scripts/deployment/download-engines.sh
+./scripts/deployment/download-engines.sh
 
 # 2. 使用本地引擎构建镜像
 docker build -f Dockerfile.local -t weiqi-game-platform .
@@ -38,7 +38,7 @@ docker run -d \
     weiqi-game-platform
 
 # 或使用 Docker Compose
-docker-compose -f docker-compose.local.yml up -d
+docker-compose -f docker/docker-compose.local.yml up -d
 ```
 
 **优点：**
@@ -137,8 +137,8 @@ git clone https://github.com/fushengburumeng/myidea.git
 cd myidea/weiqi
 
 # 2. 下载AI引擎（支持重试和镜像）
-chmod +x download-engines.sh
-./download-engines.sh
+chmod +x scripts/deployment/download-engines.sh
+./scripts/deployment/download-engines.sh
 
 # 3. 验证下载
 ls -lh ai/bin/katago/
@@ -148,10 +148,10 @@ ls -lh ai/bin/pikafish/
 docker build -f Dockerfile.local -t weiqi-game-platform .
 
 # 5. 启动服务
-docker-compose -f docker-compose.local.yml up -d
+docker-compose -f docker/docker-compose.local.yml up -d
 
 # 6. 查看日志
-docker-compose -f docker-compose.local.yml logs -f
+docker-compose -f docker/docker-compose.local.yml logs -f
 ```
 
 ---
@@ -181,7 +181,7 @@ curl http://localhost:9527
 sudo apt install unzip
 
 # 重新运行下载脚本
-./download-engines.sh
+./scripts/deployment/download-engines.sh
 ```
 
 ### 问题：Permission denied
@@ -189,7 +189,7 @@ sudo apt install unzip
 **解决：**
 ```bash
 # 添加执行权限
-chmod +x download-engines.sh
+chmod +x scripts/deployment/download-engines.sh
 chmod +x ai/bin/katago/katago
 chmod +x ai/bin/pikafish/pikafish
 ```
@@ -217,7 +217,7 @@ weiqi/
 ├── Dockerfile.local        # 本地构建Dockerfile（推荐）
 ├── Dockerfile.mirror       # 镜像加速Dockerfile
 ├── docker-compose.yml      # 原始compose配置
-├── docker-compose.local.yml # 本地构建compose配置
+├── docker/docker-compose.local.yml # 本地构建compose配置
 ├── download-engines.sh     # 引擎下载脚本
 └── ai/bin/
     ├── katago/
@@ -234,22 +234,22 @@ weiqi/
 
 ```bash
 # 下载引擎
-./download-engines.sh
+./scripts/deployment/download-engines.sh
 
 # 本地构建
 docker build -f Dockerfile.local -t weiqi-game-platform .
 
 # 启动服务
-docker-compose -f docker-compose.local.yml up -d
+docker-compose -f docker/docker-compose.local.yml up -d
 
 # 查看日志
 docker logs -f weiqi-game-server
 
 # 停止服务
-docker-compose -f docker-compose.local.yml down
+docker-compose -f docker/docker-compose.local.yml down
 
 # 重新构建
-docker-compose -f docker-compose.local.yml up -d --build
+docker-compose -f docker/docker-compose.local.yml up -d --build
 ```
 
 ---

@@ -53,11 +53,11 @@ git pull origin master
 ./fix-engines.sh
 
 # 3. 重新构建（会看到详细的验证信息）
-docker-compose -f docker-compose.local.yml down
-docker-compose -f docker-compose.local.yml build --no-cache
+docker-compose -f docker/docker-compose.local.yml down
+docker-compose -f docker/docker-compose.local.yml build --no-cache
 
 # 4. 启动
-docker-compose -f docker-compose.local.yml up -d
+docker-compose -f docker/docker-compose.local.yml up -d
 
 # 5. 查看日志
 docker logs -f weiqi-game-server
@@ -217,16 +217,16 @@ ls -lh ai/bin/pikafish/pikafish
 echo "uci" | ./ai/bin/pikafish/pikafish
 
 # 6. 停止旧容器
-docker-compose -f docker-compose.local.yml down
+docker-compose -f docker/docker-compose.local.yml down
 
 # 7. 清理旧镜像（可选）
 docker rmi weiqi-game-platform
 
 # 8. 重新构建（不使用缓存）
-docker-compose -f docker-compose.local.yml build --no-cache
+docker-compose -f docker/docker-compose.local.yml build --no-cache
 
 # 9. 启动
-docker-compose -f docker-compose.local.yml up -d
+docker-compose -f docker/docker-compose.local.yml up -d
 
 # 10. 查看日志
 docker logs -f weiqi-game-server

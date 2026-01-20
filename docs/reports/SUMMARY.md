@@ -100,13 +100,13 @@ cd myidea/weiqi
 
 # 2. 下载AI引擎
 chmod +x download-engines.sh
-./download-engines.sh
+./scripts/deployment/download-engines.sh
 
 # 3. 构建Docker镜像
 docker build -f Dockerfile.local -t weiqi-game-platform .
 
 # 4. 启动服务
-docker-compose -f docker-compose.local.yml up -d
+docker-compose -f docker/docker-compose.local.yml up -d
 
 # 5. 查看日志
 docker logs -f weiqi-game-server
@@ -278,8 +278,8 @@ docker restart weiqi-game-server
 ```bash
 cd myidea/weiqi
 git pull origin master
-./download-engines.sh  # 如果引擎有更新
-docker-compose -f docker-compose.local.yml up -d --build
+./scripts/deployment/download-engines.sh  # 如果引擎有更新
+docker-compose -f docker/docker-compose.local.yml up -d --build
 ```
 
 ---
@@ -292,7 +292,7 @@ docker-compose -f docker-compose.local.yml up -d --build
 ### Q2: Docker构建失败
 **A:** 使用本地构建方案：
 ```bash
-./download-engines.sh
+./scripts/deployment/download-engines.sh
 docker build -f Dockerfile.local -t weiqi-game-platform .
 ```
 
