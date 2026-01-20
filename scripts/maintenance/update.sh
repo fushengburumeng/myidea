@@ -24,11 +24,11 @@ echo "[2/4] 检查 AI 引擎文件..."
 
 if [ ! -f "ai/bin/katago/katago" ] || [ ! -f "ai/bin/pikafish/pikafish" ]; then
     echo "⚠ AI引擎文件缺失，需要重新下载"
-    echo "运行: ./download-engines.sh"
+    echo "运行: ./scripts/deployment/download-engines.sh"
     read -p "是否现在下载？(y/n) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        ./download-engines.sh
+        ./scripts/deployment/download-engines.sh
     else
         echo "跳过下载，继续更新..."
     fi
@@ -39,12 +39,12 @@ fi
 # 3. 停止旧容器
 echo ""
 echo "[3/4] 停止旧容器..."
-docker-compose -f docker-compose.local.yml down
+docker-compose -f docker/docker-compose.local.yml down
 
 # 4. 重新构建并启动
 echo ""
 echo "[4/4] 重新构建并启动服务..."
-docker-compose -f docker-compose.local.yml up -d --build
+docker-compose -f docker/docker-compose.local.yml up -d --build
 
 if [ $? -eq 0 ]; then
     echo ""

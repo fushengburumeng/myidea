@@ -66,7 +66,7 @@ echo "✓ AI引擎检查完成"
 echo ""
 echo "[3/5] 构建 Docker 镜像（使用清华镜像源）..."
 echo "注意：使用本地AI引擎文件，无需下载"
-docker build -t $IMAGE_NAME . --no-cache
+docker build -f docker/Dockerfile -t $IMAGE_NAME . --no-cache
 echo "✓ 镜像构建完成"
 
 # 创建日志目录
